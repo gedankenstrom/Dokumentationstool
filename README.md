@@ -1,6 +1,6 @@
 # Netzwerk-Dokumentation
 
-Responsives Webtool zur Dokumentation von Access Points an mehreren Standorten. Wähle zuerst den Standort, an dem du gerade arbeitest; Geräte, Suche und CSV-Export beziehen sich dann auf diesen Standort. Die Daten werden dauerhaft in einem Docker-Volume gespeichert.
+Responsives Webtool zur Dokumentation verschiedener Netzwerkkomponenten an mehreren Standorten. Wähle den Standort und die gewünschte Dokumentationsart. Die Daten werden dauerhaft in einem Docker-Volume gespeichert.
 
 ## In Portainer als Stack starten
 
@@ -8,7 +8,7 @@ Responsives Webtool zur Dokumentation von Access Points an mehreren Standorten. 
 2. Einen Stack-Namen vergeben, zum Beispiel `dokumentationstool`.
 3. **Web editor** auswählen und den Inhalt von `docker-compose.yml` einfügen. Alternativ bei **Git Repository** dieses Repository und `docker-compose.yml` als Compose path auswählen.
 4. **Deploy the stack** wählen.
-5. In der Weboberfläche zuerst Straße und Hausnummer als Standort anlegen. Optional kann zusätzlich eine IM- oder VITKO-Nummer hinterlegt werden. Der neue Standort wird direkt ausgewählt; danach können die Access Points dafür eingetragen werden. Für weitere Gebäude legst du einen weiteren Standort an und wechselst über die Standortauswahl.
+5. In der Weboberfläche zuerst Straße und Hausnummer als Standort anlegen. Optional kann zusätzlich eine IM- oder VITKO-Nummer hinterlegt werden. Der neue Standort wird direkt ausgewählt; danach können die Geräte und andere Netzwerkkomponenten dafür dokumentiert werden. Für weitere Gebäude legst du einen weiteren Standort an und wechselst über die Standortauswahl.
 
 Der Stack lädt `ghcr.io/gedankenstrom/dokumentationstool:latest` und veröffentlicht die Weboberfläche auf Port **8086**. Im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:8086`.
 
@@ -35,9 +35,13 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 - Für das Teilen-Menü ist HTTPS erforderlich; über eine reine HTTP-Adresse steht weiterhin der Download zur Verfügung
 - Excel-Export speichert Raum, MAC-Adresse und Seriennummer als Text, damit Excel sie nicht automatisch in Datum oder Zahlen umwandelt
 - Beim Löschen eines Standorts werden nach Bestätigung auch die zugeordneten Geräte gelöscht
+- Dokumentationsvorlagen in der Weboberfläche erstellen und verwalten, zum Beispiel für Access Points, Datendosen oder Switches
+- Je Vorlage eigene Felder anlegen, umbenennen, ein- oder ausblenden, als Pflichtfeld markieren und sortieren
+- Die bestehende Access-Point-Erfassung bleibt als Vorlage erhalten; vorhandene Einträge bleiben bei Änderungen erhalten
+- CSV- und Excel-Export verwenden die Felder und Bezeichnungen der ausgewählten Vorlage
 - AP-Modell aus vorhandenen Einträgen auswählen oder neue Modelle direkt hinzufügen; das zuletzt gespeicherte Modell wird je Standort vorausgewählt
 - Bluetooth-Tastaturscanner: Enter springt zum nächsten Feld und speichert den Datensatz nicht automatisch
-- Seriennummer, MAC-Adresse, Datenverteiler, Datendose / Port, Switch, Switch-Port und Raum
+- Einträge mit Feldern je Dokumentationsvorlage anlegen, bearbeiten, löschen und durchsuchen
 - Einträge anlegen, bearbeiten, löschen und durchsuchen
 - CSV-Export mit Semikolon als Trennzeichen
 - Persistente Speicherung im Docker-Volume `dokumentation-daten`
