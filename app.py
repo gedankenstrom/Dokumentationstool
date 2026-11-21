@@ -98,4 +98,4 @@ def export_csv():
     return Response("\ufeff" + output.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=netzwerk-dokumentation.csv"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8085)
+    app.run(host="0.0.0.0", port=8086)
