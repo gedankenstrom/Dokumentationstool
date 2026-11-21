@@ -147,24 +147,48 @@ def index():
     conn = db()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
-    models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
+    types = get_types(conn)
+    type_id = session.get("documentation_type_id")
+    current_type = conn.execute("SELECT * FROM documentation_types WHERE id=?", (type_id,)).fetchone() if type_id else None
+    if not current_type:
+        current_type = conn.execute("SELECT * FROM documentation_types WHERE name='Access Point'").fetchone()
+        session["documentation_type_id"] = current_type["id"]
+    type_id = current_type["id"]
+    fields, required_keys, custom_keys = get_fields(conn, type_id)
     site_id = session.get("current_site_id")
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
     if site_id and not current_site:
         session.pop("current_site_id", None)
-    preferred_model = current_site["default_ap_model"] if current_site else ""
-    total_devices = site_counts.get(current_site["id"], 0) if current_site else 0
+    preferred_model = current_site["default_ap_model"] if current_site and current_type["name"] == "Access Point" else ""
+    total_devices = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=? AND doc_type_id=?", (current_site["id"], type_id)).fetchone()[0] if current_site else 0
+    models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     ap_model_custom = not models
     rows = []
     if current_site:
+        params = [current_site["id"], type_id]
+        where = "site_id=? AND doc_type_id=?"
         if q:
-            like = f"%{q}%"
-            where = " OR ".join(f"{key} LIKE ?" for key, _ in FIELDS)
-            rows = conn.execute(f"SELECT * FROM access_points WHERE site_id=? AND ({where}) ORDER BY id DESC", [current_site["id"]] + [like] * len(FIELDS)).fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (current_site["id"],)).fetchall()
+            like = "%" + q + "%"
+            searchable = [key for key, _ in fields if key in {base for base, _ in FIELDS}]
+            clauses = [key + " LIKE ?" for key in searchable]
+            if custom_keys:
+                clauses.append("custom_data LIKE ?")
+            if clauses:
+                where += " AND (" + " OR ".join(clauses) + ")"
+                params.extend([like] * len(clauses))
+        rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE " + where + " ORDER BY id DESC", params).fetchall()]
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
+    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type)
+
+@app.post("/documentation-type/select")
+def select_documentation_type():
+    type_id = request.form.get("type_id", "").strip()
+    conn = db()
+    selected = conn.execute("SELECT id FROM documentation_types WHERE id=?", (type_id,)).fetchone() if type_id.isdigit() else None
+    conn.close()
+    if selected:
+        session["documentation_type_id"] = selected["id"]
+    return redirect(url_for("index"))
 
 @app.post("/sites/select")
 def select_site():
