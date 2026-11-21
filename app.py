@@ -88,7 +88,7 @@ PAGE = r'''<!doctype html>
 {% if current_site %}<h3>Aktuellen Standort bearbeiten</h3><form method="post" action="{{ url_for('update_site') }}"><div class="grid"><div class="field"><label for="edit_street">Straße</label><input id="edit_street" name="street" value="{{ current_site.street }}" required></div><div class="field"><label for="edit_house_number">Hausnummer</label><input id="edit_house_number" name="house_number" value="{{ current_site.house_number }}" required></div></div><div class="form-foot"><button class="button secondary" type="submit">Adresse aktualisieren</button></div></form>{% endif %}
 <h3>Neuen Standort anlegen</h3><form method="post" action="{{ url_for('create_site') }}"><div class="grid"><div class="field"><label for="new_street">Straße</label><input id="new_street" name="street" placeholder="z. B. Hauptstraße" required></div><div class="field"><label for="new_house_number">Hausnummer</label><input id="new_house_number" name="house_number" placeholder="z. B. 12a" required></div></div><div class="form-foot"><button class="button" type="submit">Anlegen und öffnen</button></div></form>
 </div>
-{% if sites %}<h3>Standorte löschen</h3><div class="site-admin-list">{% for s in sites %}{% set assigned = site_counts.get(s.id, 0) %}<div class="site-admin-row"><span>{{ s.street }} {{ s.house_number }} · {{ assigned }} {{ 'Gerät' if assigned==1 else 'Geräte' }}</span>{% if assigned and sites|length > 1 %}<form class="site-admin-controls" method="post" action="{{ url_for('delete_site', site_id=s.id) }}" onsubmit="return confirm('Standort löschen und die Geräte zum ausgewählten Zielstandort verschieben?')"><select class="search" name="move_to_site_id" required><option value="">Zielstandort …</option>{% for target in sites %}{% if target.id != s.id %}<option value="{{ target.id }}">{{ target.street }} {{ target.house_number }}</option>{% endif %}{% endfor %}</select><button class="device-delete" type="submit">Verschieben &amp; löschen</button></form>{% elif assigned %}<p class="note">Lege zuerst einen zweiten Standort an, um die Geräte dorthin zu verschieben.</p>{% else %}<form method="post" action="{{ url_for('delete_site', site_id=s.id) }}" onsubmit="return confirm('Diesen leeren Standort löschen?')"><button class="device-delete" type="submit">Löschen</button></form>{% endif %}</div>{% endfor %}</div>{% endif %}
+{% if sites %}<h3>Standorte löschen</h3><div class="site-admin-list">{% for s in sites %}{% set assigned = site_counts.get(s.id, 0) %}<div class="site-admin-row"><span>{{ s.street }} {{ s.house_number }} · {{ assigned }} {{ 'Gerät' if assigned==1 else 'Geräte' }}</span><form method="post" action="{{ url_for('delete_site', site_id=s.id) }}" onsubmit="return confirm('Standort und alle zugeordneten Geräte löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')"><button class="device-delete" type="submit">Standort &amp; Geräte löschen</button></form></div>{% endfor %}</div>{% endif %}
 </details></section>
 {% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else 'Access Point dokumentieren' }}</h2><form method="post" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
 {% for key,label in fields %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else '' }}" {% if key=='ap_model' %}placeholder="z. B. UniFi U6 Pro"{% elif key=='mac_address' %}placeholder="z. B. AA:BB:CC:DD:EE:FF" autocapitalize="characters"{% elif key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %} {% if key=='ap_model' %}required{% endif %}></div>{% endfor %}
@@ -155,28 +155,14 @@ def delete_site(site_id):
     if not site:
         conn.close()
         return redirect(url_for("index"))
-    device_count = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=?", (site_id,)).fetchone()[0]
-    target_id = None
-    if device_count:
-        target_value = request.form.get("move_to_site_id", "")
-        target = conn.execute("SELECT id FROM sites WHERE id=? AND id<>?", (target_value, site_id)).fetchone() if target_value.isdigit() else None
-        if not target:
-            conn.close()
-            from flask import flash
-            flash("Bitte einen anderen Standort als Ziel für die Geräte auswählen.")
-            return redirect(url_for("index"))
-        target_id = target["id"]
-        conn.execute("UPDATE access_points SET site_id=? WHERE site_id=?", (target_id, site_id))
+    conn.execute("DELETE FROM access_points WHERE site_id=?", (site_id,))
     conn.execute("DELETE FROM sites WHERE id=?", (site_id,))
     conn.commit()
     conn.close()
     if session.get("current_site_id") == site_id:
-        if target_id:
-            session["current_site_id"] = target_id
-        else:
-            session.pop("current_site_id", None)
+        session.pop("current_site_id", None)
     from flask import flash
-    flash("Standort gelöscht; zugeordnete Geräte wurden verschoben." if device_count else "Standort gelöscht.")
+    flash("Standort und zugeordnete Geräte gelöscht.")
     return redirect(url_for("index"))
 
 @app.post("/sites/update")
