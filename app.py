@@ -91,11 +91,14 @@ def db():
     if "custom_data" not in columns:
         conn.execute("ALTER TABLE access_points ADD COLUMN custom_data TEXT NOT NULL DEFAULT '{}'")
     conn.execute("CREATE TABLE IF NOT EXISTS documentation_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
-    conn.execute("CREATE TABLE IF NOT EXISTS documentation_fields (id INTEGER PRIMARY KEY AUTOINCREMENT, type_id INTEGER NOT NULL REFERENCES documentation_types(id) ON DELETE CASCADE, field_key TEXT NOT NULL, label TEXT NOT NULL, required INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, is_custom INTEGER NOT NULL DEFAULT 0, UNIQUE(type_id, field_key))")
+    conn.execute("CREATE TABLE IF NOT EXISTS documentation_fields (id INTEGER PRIMARY KEY AUTOINCREMENT, type_id INTEGER NOT NULL REFERENCES documentation_types(id) ON DELETE CASCADE, field_key TEXT NOT NULL, label TEXT NOT NULL, required INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, is_custom INTEGER NOT NULL DEFAULT 0, remember_values INTEGER NOT NULL DEFAULT 0, UNIQUE(type_id, field_key))")
     conn.execute("INSERT OR IGNORE INTO documentation_types (name) VALUES ('Access Point')")
     ap_type_id = conn.execute("SELECT id FROM documentation_types WHERE name='Access Point'").fetchone()[0]
     for position, (field_key, label) in enumerate(FIELDS):
         conn.execute("INSERT OR IGNORE INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom) VALUES (?,?,?,?,?,?,0)", (ap_type_id,field_key,label,1 if field_key=='ap_model' else 0,1,position))
+    field_columns = {row["name"] for row in conn.execute("PRAGMA table_info(documentation_fields)")}
+    if "remember_values" not in field_columns:
+        conn.execute("ALTER TABLE documentation_fields ADD COLUMN remember_values INTEGER NOT NULL DEFAULT 0")
     conn.execute("UPDATE access_points SET doc_type_id=? WHERE doc_type_id IS NULL", (ap_type_id,))
     conn.commit()
     return conn
@@ -107,6 +110,28 @@ def get_types(conn):
 def get_fields(conn, type_id):
     rows = conn.execute("SELECT field_key,label,required,is_custom FROM documentation_fields WHERE type_id=? AND enabled=1 ORDER BY position,id", (type_id,)).fetchall()
     return [(row["field_key"], row["label"]) for row in rows], {row["field_key"] for row in rows if row["required"]}, {row["field_key"] for row in rows if row["is_custom"]}
+
+
+def get_remember_fields(conn, type_id):
+    return {row["field_key"] for row in conn.execute("SELECT field_key FROM documentation_fields WHERE type_id=? AND enabled=1 AND remember_values=1", (type_id,))}
+
+def get_field_suggestions(conn, type_id, keys):
+    values = {key: set() for key in keys}
+    if not keys:
+        return {}
+    rows = conn.execute("SELECT * FROM access_points WHERE doc_type_id=?", (type_id,)).fetchall()
+    base_keys = {key for key, _ in FIELDS}
+    for row in rows:
+        data = dict(row)
+        try:
+            custom = json.loads(data.get("custom_data") or "{}")
+        except (TypeError, ValueError):
+            custom = {}
+        for key in keys:
+            value = data.get(key) if key in base_keys else custom.get(key)
+            if value and str(value).strip():
+                values[key].add(str(value).strip())
+    return {key: sorted(items, key=str.casefold)[:100] for key, items in values.items()}
 
 def flatten_row(row):
     data = dict(row)
