@@ -5,6 +5,7 @@ import os
 import sqlite3
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 DB_PATH = os.environ.get("DATABASE_PATH", "/data/inventory.db")
 FIELDS = [
     ("ap_model", "AP Modell"),
