@@ -454,7 +454,7 @@ def edit(record_id):
     total_devices = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=? AND doc_type_id=?", (site_id,type_id)).fetchone()[0]
     rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE site_id=? AND doc_type_id=? ORDER BY id DESC", (site_id,type_id)).fetchall()]
     conn.close()
-    return render_template_string(PAGE, rows=rows, q="", fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type)
+    return render_template_string(PAGE, rows=rows, q="", fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
