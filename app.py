@@ -505,54 +505,49 @@ def delete(record_id):
 def get_site_export_data(conn, site_id):
     site = conn.execute("SELECT street,house_number,inventory_number FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
     types = get_types(conn)
-    fields_by_type = {}
-    label_counts = {}
-    columns = []
-    for doc_type in types:
-        fields, _, _ = get_fields(conn, doc_type["id"])
-        fields_by_type[doc_type["id"]] = fields
-        for key, label in fields:
-            columns.append((doc_type["id"],doc_type["name"],key,label))
-            normalized = label.strip().casefold()
-            label_counts[normalized] = label_counts.get(normalized,0) + 1
-    headers = []
-    for type_id, type_name, key, label in columns:
-        output_label = label + " (" + type_name + ")" if label_counts[label.strip().casefold()] > 1 else label
-        headers.append((type_id,key,output_label))
     records = []
     if site_id:
         for raw in conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall():
             row = flatten_row(raw)
             row["documentation_type"] = next((t["name"] for t in types if t["id"] == row.get("doc_type_id")), "Unbekannt")
             records.append(row)
-    return site, headers, records
+    return site, types, records
 
 @app.get("/export.xlsx")
 def export_xlsx():
     site_id = session.get("current_site_id")
     conn = db()
-    site, columns, records = get_site_export_data(conn, site_id)
+    site, types, records = get_site_export_data(conn, site_id)
+    fields_by_type = {doc_type["id"]: get_fields(conn, doc_type["id"])[0] for doc_type in types}
     conn.close()
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Dokumentation"
-    headers = ["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,_,label in columns]
-    sheet.append(headers)
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
     inventory_number = site["inventory_number"] if site else ""
-    for row in records:
-        values = [row.get(key,"") if row.get("doc_type_id")==field_type_id else "" for field_type_id,key,_ in columns]
-        sheet.append([site_address,inventory_number,row["documentation_type"]] + values)
-    for cell in sheet[1]:
-        cell.font = Font(bold=True,color="FFFFFF")
-        cell.fill = PatternFill("solid",fgColor="102B46")
-    for row in sheet.iter_rows(min_row=2):
-        for cell in row:
-            cell.data_type = "s"
-            cell.number_format = "@"
-    sheet.freeze_panes = "A2"
-    sheet.auto_filter.ref = sheet.dimensions
+    max_columns = max([3 + len(fields) for fields in fields_by_type.values()] + [3])
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Gesamtexport"
     sheet.sheet_view.showGridLines = False
+    for doc_type in types:
+        fields = fields_by_type[doc_type["id"]]
+        section_row = sheet.max_row + 1
+        sheet.append(["Dokumentationsart: " + doc_type["name"]] + [""] * (max_columns - 1))
+        for cell in sheet[section_row]:
+            cell.fill = PatternFill("solid",fgColor="087F8C")
+            cell.font = Font(bold=True,color="FFFFFF")
+        headers = ["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,label in fields]
+        header_row = sheet.max_row + 1
+        sheet.append(headers)
+        for cell in sheet[header_row]:
+            cell.font = Font(bold=True,color="FFFFFF")
+            cell.fill = PatternFill("solid",fgColor="102B46")
+        type_records = [row for row in records if row.get("doc_type_id")==doc_type["id"]]
+        for row in type_records:
+            values = [site_address,inventory_number,doc_type["name"]] + [row.get(key,"") for key,_ in fields]
+            sheet.append(values)
+            for cell in sheet[sheet.max_row]:
+                cell.data_type = "s"
+                cell.number_format = "@"
+        sheet.append([])
     for column in sheet.columns:
         letter = column[0].column_letter
         width = max(len(str(cell.value or "")) for cell in column)
@@ -567,16 +562,21 @@ def export_xlsx():
 def export_csv():
     site_id = session.get("current_site_id")
     conn = db()
-    site, columns, records = get_site_export_data(conn, site_id)
+    site, types, records = get_site_export_data(conn, site_id)
+    fields_by_type = {doc_type["id"]: get_fields(conn, doc_type["id"])[0] for doc_type in types}
     conn.close()
-    output = io.StringIO(newline="")
-    writer = csv.writer(output,delimiter=";")
-    writer.writerow(["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,_,label in columns])
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
     inventory_number = site["inventory_number"] if site else ""
-    for row in records:
-        values = [row.get(key,"") if row.get("doc_type_id")==field_type_id else "" for field_type_id,key,_ in columns]
-        writer.writerow([site_address,inventory_number,row["documentation_type"]] + values)
+    output = io.StringIO(newline="")
+    writer = csv.writer(output,delimiter=";")
+    for doc_type in types:
+        fields = fields_by_type[doc_type["id"]]
+        writer.writerow(["Dokumentationsart: " + doc_type["name"]])
+        writer.writerow(["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,label in fields])
+        for row in records:
+            if row.get("doc_type_id") == doc_type["id"]:
+                writer.writerow([site_address,inventory_number,doc_type["name"]] + [row.get(key,"") for key,_ in fields])
+        writer.writerow([])
     site_filename = secure_filename(" ".join(part for part in [site["street"],site["house_number"],site["inventory_number"],"Gesamtdokumentation"] if part).strip()) if site else "netzwerk-dokumentation"
     return Response("\ufeff"+output.getvalue(),mimetype="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="{site_filename}.csv"'})
 
