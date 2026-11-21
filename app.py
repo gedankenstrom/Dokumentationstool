@@ -1,12 +1,39 @@
 from flask import Flask, Response, abort, redirect, render_template_string, request, session, url_for
 import csv
+import fcntl
 import io
 import os
 import sqlite3
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 DB_PATH = os.environ.get("DATABASE_PATH", "/data/inventory.db")
+
+def load_secret_key():
+    configured_key = os.environ.get("SECRET_KEY")
+    if configured_key:
+        return configured_key
+    data_dir = os.path.dirname(DB_PATH)
+    os.makedirs(data_dir, exist_ok=True)
+    key_path = os.path.join(data_dir, "flask_secret_key")
+    lock_path = os.path.join(data_dir, ".flask_secret_key.lock")
+    with open(lock_path, "a+b") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            with open(key_path, "rb") as key_file:
+                key = key_file.read()
+                if key:
+                    return key
+        except FileNotFoundError:
+            pass
+        key = os.urandom(32)
+        fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as key_file:
+            key_file.write(key)
+            key_file.flush()
+            os.fsync(key_file.fileno())
+        return key
+
+app.secret_key = load_secret_key()
 FIELDS = [
     ("ap_model", "AP Modell"),
     ("serial_number", "Seriennummer"),
