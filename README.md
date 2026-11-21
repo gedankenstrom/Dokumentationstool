@@ -9,7 +9,7 @@ Responsives Webtool zur Dokumentation von Access Points. Funktioniert auf Smartp
 3. **Web editor** auswählen und den Inhalt von `docker-compose.yml` einfügen. Alternativ bei **Git Repository** dieses Repository und `docker-compose.yml` als Compose path auswählen.
 4. **Deploy the stack** wählen.
 
-Der Stack lädt `ghcr.io/gedankenstrom/dokumentationstool:latest` und veröffentlicht die Weboberfläche auf Port **8085**. Im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:8085`.
+Der Stack lädt `ghcr.io/gedankenstrom/dokumentationstool:latest` und veröffentlicht die Weboberfläche auf Port **8086**. Im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:8086`.
 
 Das Volume `dokumentation-daten` enthält die Datenbank und bleibt bei Container-Neustarts erhalten.
 
@@ -23,7 +23,7 @@ GitHub Actions baut das Image bei jedem Push auf `main` und veröffentlicht es i
 
 ## Smartphone-Zugriff
 
-iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende die IP-Adresse des Hosts mit Port 8085. Für Zugriff von außerhalb des lokalen Netzwerks VPN oder HTTPS-Reverse-Proxy verwenden.
+iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende die IP-Adresse des Hosts mit Port 8086. Für Zugriff von außerhalb des lokalen Netzwerks VPN oder HTTPS-Reverse-Proxy verwenden.
 
 ## Enthalten
 
