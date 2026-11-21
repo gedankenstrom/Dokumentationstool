@@ -35,7 +35,7 @@ Du kannst eigene Dokumentationsarten anlegen, zum Beispiel für Access Points, N
 
 Unter **Vorlagen verwalten** kannst du für jede eigene Vorlage:
 
-- Textfelder hinzufügen, umbenennen, ein- oder ausblenden
+- Textfelder hinzufügen, umbenennen, ein- oder ausblenden und einzelne Felder löschen; beim Löschen werden auch die gespeicherten Werte dieses Feldes entfernt
 - Felder als Pflichtfelder markieren
 - die Reihenfolge mit **↑** und **↓** ändern
 - optional **Dropdown mit bisherigen Werten** aktivieren
