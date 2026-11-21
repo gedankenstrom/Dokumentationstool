@@ -37,7 +37,7 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 - Beim Löschen eines Standorts werden nach Bestätigung auch die zugeordneten Geräte gelöscht
 - Dokumentationsvorlagen in der Weboberfläche erstellen und verwalten, zum Beispiel für Access Points, Datendosen oder Switches
 - Je Vorlage eigene Felder anlegen, umbenennen, ein- oder ausblenden, als Pflichtfeld markieren und sortieren
-- Für Textfelder optional „Auswahl merken“ aktivieren; bereits eingegebene Werte derselben Dokumentationsart erscheinen dann im Dropdown; eigene Werte lassen sich weiterhin ergänzen
+- Für Textfelder optional „Auswahl merken“ aktivieren; bereits eingegebene Werte derselben Dokumentationsart erscheinen dann im Dropdown; die letzte Auswahl wird je Standort vorausgewählt und eigene Werte lassen sich weiterhin ergänzen
 - Die bestehende Access-Point-Erfassung bleibt als Vorlage erhalten; auch ihre Felder lassen sich im Editor wie bei anderen Vorlagen bearbeiten. Für das AP-Modell ist das Dropdown mit bisherigen Werten optional
 - Vorhandene Einträge bleiben bei Änderungen an Vorlagen erhalten
 - CSV- und Excel-Export verwenden die Felder und Bezeichnungen der ausgewählten Vorlage
