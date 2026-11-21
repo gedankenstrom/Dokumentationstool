@@ -229,16 +229,19 @@ def manage_templates():
                 flash("Feld gespeichert.")
         elif action == "delete_type" and type_id.isdigit():
             doc_type = conn.execute("SELECT name FROM documentation_types WHERE id=?", (type_id,)).fetchone()
-            count = conn.execute("SELECT COUNT(*) FROM access_points WHERE doc_type_id=?", (type_id,)).fetchone()[0]
-            if doc_type and doc_type["name"] != "Access Point" and count == 0:
+            if doc_type and doc_type["name"] != "Access Point":
+                conn.execute("DELETE FROM access_points WHERE doc_type_id=?", (type_id,))
+                conn.execute("DELETE FROM site_field_defaults WHERE type_id=?", (type_id,))
                 conn.execute("DELETE FROM documentation_fields WHERE type_id=?", (type_id,))
                 conn.execute("DELETE FROM documentation_types WHERE id=?", (type_id,))
                 conn.commit()
+                if str(session.get("documentation_type_id")) == type_id:
+                    session.pop("documentation_type_id", None)
                 from flask import flash
-                flash("Dokumentationsvorlage gelöscht.")
+                flash("Dokumentationsvorlage und alle zugehörigen Einträge gelöscht.")
             else:
                 from flask import flash
-                flash("Diese Vorlage kann nicht gelöscht werden, solange Einträge vorhanden sind oder es die Access-Point-Vorlage ist.")
+                flash("Die Access-Point-Vorlage kann nicht gelöscht werden.")
         conn.close()
         return redirect(url_for("manage_templates", type_id=type_id or request.args.get("type_id", "")))
     types = get_types(conn)
