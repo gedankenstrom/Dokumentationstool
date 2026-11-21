@@ -526,7 +526,6 @@ def export_xlsx():
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Gesamtexport"
-    sheet.delete_rows(1,1)
     sheet.sheet_view.showGridLines = False
     for doc_type in types:
         fields = fields_by_type[doc_type["id"]]
@@ -549,6 +548,7 @@ def export_xlsx():
                 cell.data_type = "s"
                 cell.number_format = "@"
         sheet.append([""])
+    sheet.delete_rows(1,1)
     for column in sheet.columns:
         letter = column[0].column_letter
         width = max(len(str(cell.value or "")) for cell in column)
