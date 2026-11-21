@@ -365,6 +365,7 @@ def save(record_id=None):
         conn.close()
         return redirect(url_for("index"))
     fields, required_keys, custom_keys = get_fields(conn, type_id)
+    remember_keys = get_remember_fields(conn, type_id)
     if not fields:
         conn.close()
         from flask import flash
