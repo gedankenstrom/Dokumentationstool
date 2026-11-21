@@ -124,6 +124,11 @@ def get_field_suggestions(conn, type_id, keys):
     if not keys:
         return {}
     rows = conn.execute("SELECT * FROM access_points WHERE doc_type_id=?", (type_id,)).fetchall()
+    if "ap_model" in keys:
+        ap_type = conn.execute("SELECT name FROM documentation_types WHERE id=?", (type_id,)).fetchone()
+        if ap_type and ap_type["name"] == "Access Point":
+            for site in conn.execute("SELECT default_ap_model FROM sites WHERE TRIM(default_ap_model)<>''"):
+                values["ap_model"].add(site["default_ap_model"].strip())
     base_keys = {key for key, _ in FIELDS}
     for row in rows:
         data = dict(row)
