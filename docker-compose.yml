@@ -1,13 +1,13 @@
 services:
-  netzwerk-doku:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  dokumentationstool:
+    image: ghcr.io/gedankenstrom/dokumentationstool:latest
+    container_name: dokumentationstool
     restart: unless-stopped
+    pull_policy: always
     ports:
-      - "${WEB_PORT:-5000}:5000"
+      - "8085:5000"
     volumes:
-      - netzwerk-daten:/data
+      - dokumentation-daten:/data
 
 volumes:
-  netzwerk-daten:
+  dokumentation-daten:
