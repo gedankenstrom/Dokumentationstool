@@ -522,7 +522,7 @@ def export_xlsx():
     conn.close()
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
     inventory_number = site["inventory_number"] if site else ""
-    max_columns = max([3 + len(fields) for fields in fields_by_type.values()] + [3])
+    max_columns = max([1 + len(fields) for fields in fields_by_type.values()] + [1])
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Gesamtexport"
@@ -536,7 +536,7 @@ def export_xlsx():
             cell.fill = PatternFill("solid",fgColor="087F8C")
             cell.font = Font(bold=True,color="FFFFFF")
         current_row += 1
-        headers = ["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,label in fields]
+        headers = ["Standort"] + [label for _,label in fields]
         for column_index, value in enumerate(headers,1):
             cell = sheet.cell(row=current_row,column=column_index,value=value)
             cell.font = Font(bold=True,color="FFFFFF")
@@ -545,7 +545,7 @@ def export_xlsx():
         for row in records:
             if row.get("doc_type_id") != doc_type["id"]:
                 continue
-            values = [site_address,inventory_number,doc_type["name"]] + [row.get(key,"") for key,_ in fields]
+            values = [site_address] + [row.get(key,"") for key,_ in fields]
             for column_index, value in enumerate(values,1):
                 cell = sheet.cell(row=current_row,column=column_index,value=value)
                 cell.data_type = "s"
@@ -576,10 +576,10 @@ def export_csv():
     for doc_type in types:
         fields = fields_by_type[doc_type["id"]]
         writer.writerow(["Dokumentationsart: " + doc_type["name"]])
-        writer.writerow(["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,label in fields])
+        writer.writerow(["Standort"] + [label for _,label in fields])
         for row in records:
             if row.get("doc_type_id") == doc_type["id"]:
-                writer.writerow([site_address,inventory_number,doc_type["name"]] + [row.get(key,"") for key,_ in fields])
+                writer.writerow([site_address] + [row.get(key,"") for key,_ in fields])
         writer.writerow([])
     site_filename = secure_filename(" ".join(part for part in [site["street"],site["house_number"],site["inventory_number"],"Gesamtdokumentation"] if part).strip()) if site else "netzwerk-dokumentation"
     return Response("\ufeff"+output.getvalue(),mimetype="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="{site_filename}.csv"'})
