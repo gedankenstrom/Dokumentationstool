@@ -6,5 +6,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 RUN mkdir -p /data && useradd --system --uid 10001 appuser && chown -R appuser:appuser /app /data
 USER appuser
-EXPOSE 8085
-CMD ["gunicorn", "--bind", "0.0.0.0:8085", "--workers", "2", "app:app"]
+EXPOSE 8086
+CMD ["gunicorn", "--bind", "0.0.0.0:8086", "--workers", "2", "app:app"]
