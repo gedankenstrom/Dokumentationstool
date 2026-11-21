@@ -246,6 +246,8 @@ def index():
         session["documentation_type_id"] = current_type["id"]
     type_id = current_type["id"]
     fields, required_keys, custom_keys = get_fields(conn, type_id)
+    remember_keys = get_remember_fields(conn, type_id)
+    suggestions = get_field_suggestions(conn, type_id, remember_keys)
     site_id = session.get("current_site_id")
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
     if site_id and not current_site:
@@ -269,7 +271,7 @@ def index():
                 params.extend([like] * len(clauses))
         rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE " + where + " ORDER BY id DESC", params).fetchall()]
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type)
+    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions)
 
 @app.post("/documentation-type/select")
 def select_documentation_type():
@@ -439,6 +441,8 @@ def edit(record_id):
     type_id = raw_item["doc_type_id"]
     current_type = conn.execute("SELECT * FROM documentation_types WHERE id=?", (type_id,)).fetchone()
     fields, required_keys, custom_keys = get_fields(conn, type_id)
+    remember_keys = get_remember_fields(conn, type_id)
+    suggestions = get_field_suggestions(conn, type_id, remember_keys)
     item = flatten_row(raw_item)
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     types = get_types(conn)
