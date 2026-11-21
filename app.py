@@ -29,6 +29,11 @@ def db():
         outlet_port TEXT NOT NULL DEFAULT '', switch_name TEXT NOT NULL DEFAULT '',
         switch_port TEXT NOT NULL DEFAULT '', room TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS site_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        street TEXT NOT NULL DEFAULT '',
+        house_number TEXT NOT NULL DEFAULT ''
+    )""")
     return conn
 
 PAGE = r'''<!doctype html>
@@ -36,9 +41,10 @@ PAGE = r'''<!doctype html>
 <style>
 :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172b3a;background:#f2f6f9;font-synthesis:none}*{box-sizing:border-box}body{margin:0}.top{background:#102b46;color:white;padding:24px max(20px,calc((100% - 1100px)/2));}.top small{color:#a9c8df;letter-spacing:.12em;text-transform:uppercase;font-weight:700}.top h1{margin:6px 0 0;font-size:clamp(1.4rem,4vw,2rem)}main{max-width:1100px;margin:26px auto;padding:0 18px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.button{border:0;border-radius:10px;padding:12px 16px;background:#087f8c;color:white;font-weight:700;text-decoration:none;cursor:pointer;font-size:.95rem}.button.secondary{background:white;color:#254357;border:1px solid #d6e1e8}.button.danger{background:#fff0ed;color:#a63f2d}.card{background:#fff;border:1px solid #e0e8ee;border-radius:16px;padding:20px;box-shadow:0 5px 18px #16324a0a;margin-bottom:18px}.card h2{margin:0 0 18px;font-size:1.1rem}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field label{display:block;font-size:.83rem;font-weight:700;color:#405a6b;margin:0 0 6px}.field input{width:100%;height:46px;padding:10px 12px;border:1px solid #cad8e1;border-radius:9px;font:inherit;background:#fff}.field input:focus,.search:focus{outline:3px solid #087f8c33;border-color:#087f8c}.form-foot{display:flex;gap:10px;margin-top:18px}.searchrow{display:flex;gap:10px;margin-bottom:14px}.search{flex:1;min-width:0;height:44px;border:1px solid #d3dfe7;border-radius:9px;padding:10px 12px;font:inherit}.count{color:#617988;font-size:.9rem;margin:0 0 12px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:.9rem}th{text-align:left;color:#5b7180;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;padding:11px 10px;border-bottom:1px solid #e1e9ee}td{padding:13px 10px;border-bottom:1px solid #edf1f4;vertical-align:top}tbody tr:last-child td{border:0}.actions-cell{white-space:nowrap}.link{color:#087f8c;font-weight:700;text-decoration:none}.empty{text-align:center;padding:30px;color:#647987}.flash{padding:12px;border-radius:9px;background:#e7f5f2;color:#12695d;margin-bottom:15px}.mobile-list{display:none}.mobile-item{border-top:1px solid #e7edf1;padding:14px 0}.mobile-item:first-child{border:0}.mobile-title{display:flex;justify-content:space-between;gap:12px;font-weight:750}.mobile-meta{color:#526a7a;font-size:.9rem;line-height:1.6;margin-top:7px}.mobile-meta b{color:#253f50}.mobile-links{display:flex;gap:14px;margin-top:9px}.note{color:#708391;font-size:.85rem;margin-top:13px}
 @media(max-width:700px){main{margin:17px auto;padding:0 13px}.top{padding:20px 16px}.card{padding:16px;border-radius:13px}.grid{grid-template-columns:1fr;gap:12px}.desktop{display:none}.mobile-list{display:block}.searchrow .button{padding:11px 12px}.form-foot .button{flex:1}.actions .button{flex:1;text-align:center}.searchrow{gap:7px}}
-</style></head><body><header class="top"><small>IT Inventar</small><h1>Netzwerk-Dokumentation</h1></header><main>
+</style></head><body><header class="top"><small>IT Inventar</small><h1>Netzwerk-Dokumentation</h1>{% if site.street or site.house_number %}<div style="margin-top:6px;color:#d1e2ef">{{ site.street }} {{ site.house_number }}</div>{% endif %}</header><main>
 {% with messages = get_flashed_messages() %}{% if messages %}<div class="flash">{{ messages[0] }}</div>{% endif %}{% endwith %}
 <div class="actions"><a class="button" href="#entry">＋ Gerät eintragen</a><a class="button secondary" href="{{ url_for('export_csv') }}">↓ CSV exportieren</a></div>
+<section class="card"><h2>Übergeordneter Standort</h2><form method="post" action="{{ url_for('save_site') }}"><div class="grid"><div class="field"><label for="street">Straße</label><input id="street" name="street" value="{{ site.street }}" placeholder="z. B. Hauptstraße"></div><div class="field"><label for="house_number">Hausnummer</label><input id="house_number" name="house_number" value="{{ site.house_number }}" placeholder="z. B. 12a"></div></div><div class="form-foot"><button class="button" type="submit">Standort speichern</button></div></form></section>
 <section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else 'Access Point dokumentieren' }}</h2><form method="post" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
 {% for key,label in fields %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else '' }}" {% if key=='ap_model' %}placeholder="z. B. UniFi U6 Pro"{% elif key=='mac_address' %}placeholder="z. B. AA:BB:CC:DD:EE:FF" autocapitalize="characters"{% elif key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %} {% if key=='ap_model' %}required{% endif %}></div>{% endfor %}
 </div><div class="form-foot"><button class="button" type="submit">{{ 'Änderungen speichern' if item else 'Eintrag speichern' }}</button>{% if item %}<a class="button secondary" href="{{ url_for('index') }}">Abbrechen</a>{% endif %}</div></form></section>
@@ -57,8 +63,23 @@ def index():
         rows = conn.execute(f"SELECT * FROM access_points WHERE {where} ORDER BY id DESC", [like] * len(FIELDS)).fetchall()
     else:
         rows = conn.execute("SELECT * FROM access_points ORDER BY id DESC").fetchall()
+    site = conn.execute("SELECT street, house_number FROM site_settings WHERE id=1").fetchone() or {"street": "", "house_number": ""}
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None)
+    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, site=site)
+
+@app.post("/site/save")
+def save_site():
+    street = request.form.get("street", "").strip()
+    house_number = request.form.get("house_number", "").strip()
+    conn = db()
+    conn.execute("""INSERT INTO site_settings (id, street, house_number) VALUES (1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET street=excluded.street, house_number=excluded.house_number""",
+        (street, house_number))
+    conn.commit()
+    conn.close()
+    from flask import flash
+    flash("Standort gespeichert.")
+    return redirect(url_for("index"))
 
 @app.post("/save")
 @app.post("/save/<int:record_id>")
@@ -80,8 +101,10 @@ def save(record_id=None):
 def edit(record_id):
     conn = db(); item = conn.execute("SELECT * FROM access_points WHERE id=?", (record_id,)).fetchone(); conn.close()
     if not item: abort(404)
-    conn = db(); rows = conn.execute("SELECT * FROM access_points ORDER BY id DESC").fetchall(); conn.close()
-    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item)
+    conn = db(); rows = conn.execute("SELECT * FROM access_points ORDER BY id DESC").fetchall()
+    site = conn.execute("SELECT street, house_number FROM site_settings WHERE id=1").fetchone() or {"street": "", "house_number": ""}
+    conn.close()
+    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, site=site)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
