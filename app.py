@@ -95,7 +95,7 @@ PAGE = r'''<!doctype html>
 <h3 id="new-site">Neuen Standort anlegen</h3><form method="post" action="{{ url_for('create_site') }}"><div class="grid"><div class="field"><label for="new_street">Straße</label><input id="new_street" name="street" placeholder="z. B. Hauptstraße" required></div><div class="field"><label for="new_house_number">Hausnummer</label><input id="new_house_number" name="house_number" placeholder="z. B. 12a" required></div></div><div class="form-foot"><button class="button" type="submit">Anlegen und öffnen</button></div></form>
 </div>
 {% if sites %}<h3>Standorte löschen</h3><div class="site-admin-list">{% for s in sites %}{% set assigned = site_counts.get(s.id, 0) %}<div class="site-admin-row"><span>{{ s.street }} {{ s.house_number }} · {{ assigned }} {{ 'Gerät' if assigned==1 else 'Geräte' }}</span><form method="post" action="{{ url_for('delete_site', site_id=s.id) }}" onsubmit="return confirm('Standort und alle zugeordneten Geräte löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')"><button class="device-delete" type="submit">Standort &amp; Geräte löschen</button></form></div>{% endfor %}</div>{% endif %}
-<h3>AP-Modelle verwalten</h3><div class="site-admin-list">{% for model in models %}{% set used = model_counts.get(model, 0) %}{% set orphaned = orphan_model_counts.get(model, 0) %}<div class="site-admin-row"><span>{{ model }}</span>{% if orphaned %}<form method="post" action="{{ url_for('delete_orphan_model_records') }}" onsubmit="return confirm('{{ orphaned }} nicht zugeordnete Gerätedatensätze für {{ model }} löschen?')"><input type="hidden" name="model" value="{{ model }}"><button class="device-delete" type="submit">Verwaiste Datensätze löschen ({{ orphaned }})</button></form>{% elif used %}<span class="note">{{ used }} {{ 'Gerät' if used==1 else 'Geräte' }} verwenden dieses Modell</span>{% else %}<form method="post" action="{{ url_for('delete_model') }}" onsubmit="return confirm('Modell {{ model }} aus allen Standort-Standards entfernen?')"><input type="hidden" name="model" value="{{ model }}"><button class="device-delete" type="submit">Modell entfernen</button></form>{% endif %}</div>{% else %}<p class="note">Keine gespeicherten Modelle.</p>{% endfor %}</div>
+
 
 </details></section>
 {% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else 'Access Point dokumentieren' }}</h2><form method="post" autocomplete="off" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
@@ -112,9 +112,6 @@ def index():
     conn = db()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
-    model_counts = {row["ap_model"]: row["total"] for row in conn.execute("SELECT ap_model, COUNT(*) AS total FROM access_points WHERE TRIM(ap_model)<>'' GROUP BY ap_model")}
-    orphan_model_counts = {row["ap_model"]: row["total"] for row in conn.execute("SELECT ap.ap_model, COUNT(*) AS total FROM access_points ap LEFT JOIN sites s ON s.id=ap.site_id WHERE TRIM(ap.ap_model)<>'' AND s.id IS NULL GROUP BY ap.ap_model")}
-    orphan_model_counts = {row["ap_model"]: row["total"] for row in conn.execute("SELECT ap.ap_model, COUNT(*) AS total FROM access_points ap LEFT JOIN sites s ON s.id=ap.site_id WHERE TRIM(ap.ap_model)<>'' AND s.id IS NULL GROUP BY ap.ap_model")}
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     site_id = session.get("current_site_id")
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
@@ -132,7 +129,7 @@ def index():
         else:
             rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (current_site["id"],)).fetchall()
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, model_counts=model_counts, orphan_model_counts=orphan_model_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
+    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
 
 @app.post("/sites/select")
 def select_site():
@@ -178,46 +175,6 @@ def delete_site(site_id):
         session.pop("current_site_id", None)
     from flask import flash
     flash("Standort und zugeordnete Geräte gelöscht.")
-    return redirect(url_for("index"))
-
-@app.post("/models/delete-orphans")
-def delete_orphan_model_records():
-    model = request.form.get("model", "").strip()
-    conn = db()
-    orphaned = conn.execute("""SELECT COUNT(*) FROM access_points ap
-        LEFT JOIN sites s ON s.id=ap.site_id
-        WHERE ap.ap_model=? AND s.id IS NULL""", (model,)).fetchone()[0]
-    if not orphaned:
-        conn.close()
-        from flask import flash
-        flash("Für dieses Modell gibt es keine verwaisten Gerätedatensätze.")
-        return redirect(url_for("index"))
-    conn.execute("""DELETE FROM access_points
-        WHERE ap_model=? AND NOT EXISTS (SELECT 1 FROM sites WHERE sites.id=access_points.site_id)""", (model,))
-    remaining = conn.execute("SELECT COUNT(*) FROM access_points WHERE ap_model=?", (model,)).fetchone()[0]
-    if not remaining:
-        conn.execute("UPDATE sites SET default_ap_model='' WHERE default_ap_model=?", (model,))
-    conn.commit()
-    conn.close()
-    from flask import flash
-    flash(f"{orphaned} nicht zugeordnete Gerätedatensätze gelöscht." + (" Das Modell ist jetzt entfernt." if not remaining else " Das Modell wird noch von zugeordneten Geräten verwendet."))
-    return redirect(url_for("index"))
-
-@app.post("/models/delete")
-def delete_model():
-    model = request.form.get("model", "").strip()
-    conn = db()
-    used = conn.execute("SELECT COUNT(*) FROM access_points WHERE ap_model=?", (model,)).fetchone()[0]
-    if used:
-        conn.close()
-        from flask import flash
-        flash(f"Das Modell wird noch von {used} Geräten verwendet und kann nicht entfernt werden.")
-        return redirect(url_for("index"))
-    conn.execute("UPDATE sites SET default_ap_model='' WHERE default_ap_model=?", (model,))
-    conn.commit()
-    conn.close()
-    from flask import flash
-    flash(f"Modell „{model}“ entfernt.")
     return redirect(url_for("index"))
 
 @app.post("/sites/update")
@@ -286,7 +243,6 @@ def edit(record_id):
     item = conn.execute("SELECT * FROM access_points WHERE id=? AND site_id=?", (record_id, site_id)).fetchone()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
-    model_counts = {row["ap_model"]: row["total"] for row in conn.execute("SELECT ap_model, COUNT(*) AS total FROM access_points WHERE TRIM(ap_model)<>'' GROUP BY ap_model")}
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     ap_model_custom = item is not None and item["ap_model"] not in models
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
@@ -296,7 +252,7 @@ def edit(record_id):
     conn.close()
     if not item or not current_site:
         abort(404)
-    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, model_counts=model_counts, orphan_model_counts=orphan_model_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
+    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
