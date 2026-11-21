@@ -29,7 +29,8 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 ## Enthalten
 
 - Mehrere Standorte mit jeweils Straße und Hausnummer; jeder Access Point ist einem Standort zugeordnet
-- CSV-Export enthält den Standort als zusätzliche Spalte
+- CSV- und Excel-Export enthalten den Standort als zusätzliche Spalte
+- Excel-Export speichert Raum, MAC-Adresse und Seriennummer als Text, damit Excel sie nicht automatisch in Datum oder Zahlen umwandelt
 - Beim Löschen eines Standorts werden nach Bestätigung auch die zugeordneten Geräte gelöscht
 - AP-Modell aus vorhandenen Einträgen auswählen oder neue Modelle direkt hinzufügen; das zuletzt gespeicherte Modell wird je Standort vorausgewählt
 - Seriennummer, MAC-Adresse, Datenverteiler, Datendose / Port, Switch, Switch-Port und Raum
