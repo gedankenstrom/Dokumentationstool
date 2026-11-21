@@ -1,18 +1,36 @@
 # Netzwerk-Dokumentation
 
-Ein kleines, responsives Webtool zur Dokumentation von Access Points. Die Oberfläche funktioniert auf Smartphones, Tablets und Desktopgeräten. Daten bleiben in einer SQLite-Datenbank im persistenten Docker-Volume.
+Responsives Webtool zur Dokumentation von Access Points. Funktioniert auf Smartphones, Tablets und Desktopgeräten. Daten werden in einer SQLite-Datenbank im persistenten Docker-Volume gespeichert.
 
-## Starten
+## In Portainer als Stack starten
 
-Im Projektordner ausführen:
+1. In Portainer **Stacks** öffnen und **Add stack** wählen.
+2. Einen Stack-Namen vergeben, zum Beispiel `netzwerk-doku`.
+3. Als Build-Methode **Git Repository** auswählen.
+4. Repository URL: `https://github.com/gedankenstrom/Dokumentationstool`
+5. Reference: `refs/heads/main`
+6. Compose path: `docker-compose.yml`
+7. **Deploy the stack** auswählen.
+
+Portainer lädt das Repository, baut das Image mit dem enthaltenen Dockerfile und startet den Container. Das Volume `netzwerk-daten` hält die Einträge bei einem Neustart oder einer Neuerstellung des Containers dauerhaft vor.
+
+Nach dem Start im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:5000`.
+
+### Anderen Port verwenden
+
+Wenn Port 5000 schon belegt ist, in den Stack-Umgebungsvariablen `WEB_PORT` auf einen freien Port setzen, zum Beispiel `8085`. Dann lautet die Adresse `http://<IP-Adresse-des-Docker-Hosts>:8085`.
+
+### Smartphone-Zugriff
+
+iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Die Anwendung ist dann über die IP-Adresse des Hosts erreichbar. Für Zugriff von außerhalb des lokalen Netzwerks VPN oder einen HTTPS-Reverse-Proxy verwenden.
+
+## Lokal mit Docker Compose starten
 
 ```sh
 docker compose up -d --build
 ```
 
-Dann im Browser öffnen: `http://localhost:5000`.
-
-Auf iPhone oder Android im selben WLAN die lokale IP-Adresse des Docker-Hosts verwenden, zum Beispiel `http://192.168.1.20:5000`. Für Zugriff von außerhalb des lokalen Netzes sollte ein VPN oder ein HTTPS-Reverse-Proxy verwendet werden.
+Danach `http://localhost:5000` öffnen.
 
 ## Enthalten
 
@@ -23,8 +41,8 @@ Auf iPhone oder Android im selben WLAN die lokale IP-Adresse des Docker-Hosts ve
 
 ## Datensicherung
 
-Das Datenvolume heißt `netzwerk-daten`. Ein Beispiel-Backup:
+Das Docker-Volume heißt in Docker `<stackname>_netzwerk-daten` (bei Stackname `netzwerk-doku` also üblicherweise `netzwerk-doku_netzwerk-daten`). Ein Backup-Beispiel, wenn es als `netzwerk-doku_netzwerk-daten` angelegt wurde:
 
 ```sh
-docker run --rm -v netzwerk-daten:/data -v "$PWD":/backup alpine tar czf /backup/netzwerk-daten.tar.gz -C /data .
+docker run --rm -v netzwerk-doku_netzwerk-daten:/data -v "$PWD":/backup alpine tar czf /backup/netzwerk-daten.tar.gz -C /data .
 ```
