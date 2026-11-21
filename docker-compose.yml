@@ -1,0 +1,12 @@
+services:
+  netzwerk-doku:
+    build: .
+    container_name: netzwerk-doku
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - netzwerk-daten:/data
+
+volumes:
+  netzwerk-daten:
