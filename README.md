@@ -30,7 +30,7 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 
 - Mehrere Standorte mit Straße und Hausnummer sowie optionaler IM-/VITKO-Nummer; jeder Access Point ist einem Standort zugeordnet
 - Die IM-/VITKO-Nummer ist eine Standortangabe und kein Geräte-Erfassungsfeld; iOS soll sie nicht automatisch als Telefonnummer verlinken
-- CSV- und Excel-Export enthalten alle Einträge des Standorts, gruppiert in klar getrennte Abschnitte je Dokumentationsart, sowie Straße, Hausnummer und IM-/VITKO-Nummer; die Exportdatei wird nach Adresse und optionaler IM-/VITKO-Nummer benannt
+- CSV- und Excel-Export enthalten alle Einträge des Standorts, gruppiert in klar getrennte Abschnitte je Dokumentationsart; die Standortadresse steht als Spalte im Export. Die Exportdatei wird nach Adresse und optionaler IM-/VITKO-Nummer benannt
 - Beim Export kann zwischen direktem Download und Teilen gewählt werden; auf iPhone/iPad lässt sich die Datei über das Teilen-Menü zum Beispiel an Apple Mail übergeben
 - Für das Teilen-Menü ist HTTPS erforderlich; über eine reine HTTP-Adresse steht weiterhin der Download zur Verfügung
 - Excel-Export speichert Raum, MAC-Adresse und Seriennummer als Text, damit Excel sie nicht automatisch in Datum oder Zahlen umwandelt
@@ -40,7 +40,7 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 - Für Textfelder optional „Auswahl merken“ aktivieren; bereits eingegebene Werte derselben Dokumentationsart erscheinen dann im Dropdown; die letzte Auswahl wird je Standort vorausgewählt und eigene Werte lassen sich weiterhin ergänzen
 - Die bestehende Access-Point-Erfassung bleibt als Vorlage erhalten; auch ihre Felder lassen sich im Editor wie bei anderen Vorlagen bearbeiten. Für das AP-Modell ist das Dropdown mit bisherigen Werten optional
 - Vorhandene Einträge bleiben bei Änderungen an Vorlagen erhalten
-- Jeder Exportabschnitt enthält die passenden Spalten der Dokumentationsart und wiederholt seine Tabellenüberschrift
+- Jeder Exportabschnitt enthält die passenden Gerätedaten-Spalten der Dokumentationsart und wiederholt seine Tabellenüberschrift; die Dokumentationsart steht in der Abschnittsüberschrift
 - AP-Modell aus vorhandenen Einträgen auswählen oder neue Modelle direkt hinzufügen; das zuletzt gespeicherte Modell wird je Standort vorausgewählt
 - Bluetooth-Tastaturscanner: Enter springt zum nächsten Feld und speichert den Datensatz nicht automatisch
 - Einträge mit Feldern je Dokumentationsvorlage anlegen, bearbeiten, löschen und durchsuchen
