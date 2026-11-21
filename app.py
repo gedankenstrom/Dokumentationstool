@@ -1,4 +1,5 @@
 from flask import Flask, Response, abort, redirect, render_template_string, request, session, url_for
+from werkzeug.utils import secure_filename
 import csv
 import fcntl
 import io
@@ -287,7 +288,7 @@ def export_xlsx():
     sheet.title = "Netzwerk-Dokumentation"
     sheet.append(["Standort"] + [label for _, label in FIELDS])
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
-    site_filename = " ".join(part for part in [site["street"], site["house_number"], site["inventory_number"]] if part).strip() if site else "netzwerk-dokumentation"
+    site_filename = secure_filename(" ".join(part for part in [site["street"], site["house_number"], site["inventory_number"]] if part).strip()) if site else "netzwerk-dokumentation"
     for row in rows:
         sheet.append([site_address] + [row[key] for key, _ in FIELDS])
     for cell in sheet[1]:
@@ -308,7 +309,7 @@ def export_xlsx():
     output = io.BytesIO()
     workbook.save(output)
     output.seek(0)
-    return Response(output.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename={site_filename}.xlsx"})
+    return Response(output.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{site_filename}.xlsx'})
 
 @app.get("/export.csv")
 def export_csv():
@@ -324,9 +325,9 @@ def export_csv():
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["Standort"] + [label for _, label in FIELDS])
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
-    site_filename = " ".join(part for part in [site["street"], site["house_number"], site["inventory_number"]] if part).strip() if site else "netzwerk-dokumentation"
+    site_filename = secure_filename(" ".join(part for part in [site["street"], site["house_number"], site["inventory_number"]] if part).strip()) if site else "netzwerk-dokumentation"
     writer.writerows([site_address] + [row[key] for key, _ in FIELDS] for row in rows)
-    return Response("\ufeff" + output.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename={site_filename}.csv"})
+    return Response("\ufeff" + output.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{site_filename}.csv'})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8086)
