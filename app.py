@@ -95,6 +95,8 @@ PAGE = r'''<!doctype html>
 <h3 id="new-site">Neuen Standort anlegen</h3><form method="post" action="{{ url_for('create_site') }}"><div class="grid"><div class="field"><label for="new_street">Straße</label><input id="new_street" name="street" placeholder="z. B. Hauptstraße" required></div><div class="field"><label for="new_house_number">Hausnummer</label><input id="new_house_number" name="house_number" placeholder="z. B. 12a" required></div></div><div class="form-foot"><button class="button" type="submit">Anlegen und öffnen</button></div></form>
 </div>
 {% if sites %}<h3>Standorte löschen</h3><div class="site-admin-list">{% for s in sites %}{% set assigned = site_counts.get(s.id, 0) %}<div class="site-admin-row"><span>{{ s.street }} {{ s.house_number }} · {{ assigned }} {{ 'Gerät' if assigned==1 else 'Geräte' }}</span><form method="post" action="{{ url_for('delete_site', site_id=s.id) }}" onsubmit="return confirm('Standort und alle zugeordneten Geräte löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')"><button class="device-delete" type="submit">Standort &amp; Geräte löschen</button></form></div>{% endfor %}</div>{% endif %}
+<h3>AP-Modelle verwalten</h3><div class="site-admin-list">{% for model in models %}{% set used = model_counts.get(model, 0) %}<div class="site-admin-row"><span>{{ model }}</span>{% if used %}<span class="note">{{ used }} {{ 'Gerät' if used==1 else 'Geräte' }} verwenden dieses Modell</span>{% else %}<form method="post" action="{{ url_for('delete_model') }}" onsubmit="return confirm('Modell {{ model }} aus allen Standort-Standards entfernen?')"><input type="hidden" name="model" value="{{ model }}"><button class="device-delete" type="submit">Modell entfernen</button></form>{% endif %}</div>{% else %}<p class="note">Keine gespeicherten Modelle.</p>{% endfor %}</div>
+
 </details></section>
 {% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else 'Access Point dokumentieren' }}</h2><form method="post" autocomplete="off" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
 {% for key,label in fields %}{% if key=='ap_model' %}<div class="field"><label for="ap_model_choice">{{ label }}</label><select id="ap_model_choice" name="ap_model_choice" onchange="toggleApModel()" required><option value="" disabled {% if not item and not preferred_model and not ap_model_custom %}selected{% endif %}>AP-Modell auswählen …</option>{% for model in models %}<option value="{{ model }}" {% if (item and item.ap_model==model) or (not item and preferred_model==model) %}selected{% endif %}>{{ model }}</option>{% endfor %}<option value="__new__" {% if ap_model_custom %}selected{% endif %}>Neues AP-Modell eingeben …</option></select><input id="ap_model_new" name="ap_model_new" value="{{ item.ap_model if item and ap_model_custom else '' }}" placeholder="z. B. UniFi U6 Pro" {% if not ap_model_custom %}hidden{% endif %} {% if ap_model_custom %}required{% endif %}></div>{% elif key=='mac_address' %}<div class="field"><label for="hardware_mac">MAC</label><input id="hardware_mac" name="hardware_mac" value="{{ item[key] if item else '' }}" placeholder="z. B. AA:BB:CC:DD:EE:FF" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text"></div>{% elif key=='switch_name' %}<div class="field"><label for="network_switch_device">Switch</label><input id="network_switch_device" name="network_switch_device" value="{{ item[key] if item else '' }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>{% else %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else '' }}" {% if key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %}></div>{% endif %}{% endfor %}
@@ -110,6 +112,7 @@ def index():
     conn = db()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
+    model_counts = {row["ap_model"]: row["total"] for row in conn.execute("SELECT ap_model, COUNT(*) AS total FROM access_points WHERE TRIM(ap_model)<>'' GROUP BY ap_model")}
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     site_id = session.get("current_site_id")
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
@@ -127,7 +130,7 @@ def index():
         else:
             rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (current_site["id"],)).fetchall()
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
+    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, model_counts=model_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
 
 @app.post("/sites/select")
 def select_site():
@@ -173,6 +176,23 @@ def delete_site(site_id):
         session.pop("current_site_id", None)
     from flask import flash
     flash("Standort und zugeordnete Geräte gelöscht.")
+    return redirect(url_for("index"))
+
+@app.post("/models/delete")
+def delete_model():
+    model = request.form.get("model", "").strip()
+    conn = db()
+    used = conn.execute("SELECT COUNT(*) FROM access_points WHERE ap_model=?", (model,)).fetchone()[0]
+    if used:
+        conn.close()
+        from flask import flash
+        flash(f"Das Modell wird noch von {used} Geräten verwendet und kann nicht entfernt werden.")
+        return redirect(url_for("index"))
+    conn.execute("UPDATE sites SET default_ap_model='' WHERE default_ap_model=?", (model,))
+    conn.commit()
+    conn.close()
+    from flask import flash
+    flash(f"Modell „{model}“ entfernt.")
     return redirect(url_for("index"))
 
 @app.post("/sites/update")
@@ -241,6 +261,7 @@ def edit(record_id):
     item = conn.execute("SELECT * FROM access_points WHERE id=? AND site_id=?", (record_id, site_id)).fetchone()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
+    model_counts = {row["ap_model"]: row["total"] for row in conn.execute("SELECT ap_model, COUNT(*) AS total FROM access_points WHERE TRIM(ap_model)<>'' GROUP BY ap_model")}
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     ap_model_custom = item is not None and item["ap_model"] not in models
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
@@ -250,7 +271,7 @@ def edit(record_id):
     conn.close()
     if not item or not current_site:
         abort(404)
-    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
+    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, model_counts=model_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
