@@ -1,6 +1,6 @@
 # Netzwerk-Dokumentation
 
-Responsives Webtool zur Dokumentation von Access Points. Funktioniert auf Smartphones, Tablets und Desktopgeräten. Die Daten werden dauerhaft in einem Docker-Volume gespeichert.
+Responsives Webtool zur Dokumentation von Access Points mit einer übergeordneten Standortadresse für Straße und Hausnummer. Funktioniert auf Smartphones, Tablets und Desktopgeräten. Die Daten werden dauerhaft in einem Docker-Volume gespeichert.
 
 ## In Portainer als Stack starten
 
@@ -27,6 +27,7 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 
 ## Enthalten
 
+- Gemeinsamer Standort mit Straße und Hausnummer
 - AP Modell, Seriennummer, MAC Adresse, Datenverteiler, Datendose / Port, Switch, Switch Port und Raum
 - Einträge anlegen, bearbeiten, löschen und durchsuchen
 - CSV-Export mit Semikolon als Trennzeichen
