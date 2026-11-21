@@ -8,7 +8,7 @@ import os
 import re
 import sqlite3
 from openpyxl import Workbook
-from openpyxl.styles import Border, Font, PatternFill, Side
+from openpyxl.styles import Font, PatternFill
 
 app = Flask(__name__)
 DB_PATH = os.environ.get("DATABASE_PATH", "/data/inventory.db")
@@ -527,37 +527,28 @@ def export_xlsx():
     sheet = workbook.active
     sheet.title = "Gesamtexport"
     sheet.sheet_view.showGridLines = False
-    thin_border = Border(left=Side(style="thin",color="A6A6A6"),right=Side(style="thin",color="A6A6A6"),top=Side(style="thin",color="A6A6A6"),bottom=Side(style="thin",color="A6A6A6"))
-    gray_fill = PatternFill("solid",fgColor="D9D9D9")
-    white_fill = PatternFill("solid",fgColor="FFFFFF")
     current_row = 1
     for doc_type in types:
         fields = fields_by_type[doc_type["id"]]
         section_label = "Dokumentationsart: " + doc_type["name"]
         for column_index in range(1,max_columns+1):
             cell = sheet.cell(row=current_row,column=column_index,value=section_label if column_index==1 else "")
-            cell.fill = gray_fill
-            cell.font = Font(bold=True,color="000000")
-            cell.border = thin_border
+            cell.fill = PatternFill("solid",fgColor="087F8C")
+            cell.font = Font(bold=True,color="FFFFFF")
         current_row += 1
         headers = ["Standort"] + [label for _,label in fields]
         for column_index in range(1,max_columns+1):
             value = headers[column_index-1] if column_index <= len(headers) else ""
             cell = sheet.cell(row=current_row,column=column_index,value=value)
-            cell.fill = gray_fill if column_index == 1 else white_fill
-            cell.font = Font(bold=(column_index == 1),color="000000")
-            cell.border = thin_border
+            cell.font = Font(bold=True,color="FFFFFF")
+            cell.fill = PatternFill("solid",fgColor="102B46")
         current_row += 1
         for row in records:
             if row.get("doc_type_id") != doc_type["id"]:
                 continue
             values = [site_address] + [row.get(key,"") for key,_ in fields]
-            values += [""] * (max_columns-len(values))
             for column_index, value in enumerate(values,1):
                 cell = sheet.cell(row=current_row,column=column_index,value=value)
-                cell.fill = gray_fill if column_index == 1 else white_fill
-                cell.font = Font(bold=(column_index == 1),color="000000")
-                cell.border = thin_border
                 cell.data_type = "s"
                 cell.number_format = "@"
             current_row += 1
