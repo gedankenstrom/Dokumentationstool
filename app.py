@@ -537,7 +537,8 @@ def export_xlsx():
             cell.font = Font(bold=True,color="FFFFFF")
         current_row += 1
         headers = ["Standort"] + [label for _,label in fields]
-        for column_index, value in enumerate(headers,1):
+        for column_index in range(1,max_columns+1):
+            value = headers[column_index-1] if column_index <= len(headers) else ""
             cell = sheet.cell(row=current_row,column=column_index,value=value)
             cell.font = Font(bold=True,color="FFFFFF")
             cell.fill = PatternFill("solid",fgColor="102B46")
