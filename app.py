@@ -4,6 +4,8 @@ import fcntl
 import io
 import os
 import sqlite3
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
 
 app = Flask(__name__)
 DB_PATH = os.environ.get("DATABASE_PATH", "/data/inventory.db")
@@ -86,7 +88,7 @@ PAGE = r'''<!doctype html>
 @media(max-width:700px){main{margin:17px auto;padding:0 13px}.top{padding:20px 16px}.card{padding:16px;border-radius:13px}.grid{grid-template-columns:1fr;gap:12px}.desktop{display:none}.mobile-list{display:flex;flex-direction:column;gap:10px}.searchrow .button{padding:11px 12px}.form-foot .button{flex:1}.actions .button{flex:1;text-align:center}.searchrow{gap:7px}}
 </style></head><body><header class="top"><small>IT Inventar</small><h1>Netzwerk-Dokumentation</h1>{% if current_site %}<div style="margin-top:6px;color:#d1e2ef">{{ current_site.street }} {{ current_site.house_number }}</div>{% else %}<div style="margin-top:6px;color:#d1e2ef">Bitte zuerst einen Standort auswählen</div>{% endif %}</header><main>
 {% with messages = get_flashed_messages() %}{% if messages %}<div class="flash">{{ messages[0] }}</div>{% endif %}{% endwith %}
-<div class="actions">{% if current_site %}<a class="button" href="#entry">＋ Gerät eintragen</a>{% else %}<a class="button" href="#new-site" onclick="document.getElementById('site-tools').open=true">＋ Standort anlegen</a>{% endif %}{% if current_site %}<a class="button secondary" href="{{ url_for('export_csv') }}">↓ CSV exportieren</a>{% endif %}</div>
+<div class="actions">{% if current_site %}<a class="button" href="#entry">＋ Gerät eintragen</a>{% else %}<a class="button" href="#new-site" onclick="document.getElementById('site-tools').open=true">＋ Standort anlegen</a>{% endif %}{% if current_site %}<a class="button secondary" href="{{ url_for('export_csv') }}">↓ CSV</a><a class="button secondary" href="{{ url_for('export_xlsx') }}">↓ Excel</a>{% endif %}</div>
 <section class="card site-card" id="sites"><h2>Standort</h2>{% if sites %}<form method="post" action="{{ url_for('select_site') }}"><div class="searchrow"><select class="search" name="site_id"><option value="">Standort auswählen …</option>{% for s in sites %}<option value="{{ s.id }}" {% if current_site and s.id==current_site.id %}selected{% endif %}>{{ s.street }} {{ s.house_number }}</option>{% endfor %}</select><button class="button" type="submit">Öffnen</button></div></form>{% else %}<p class="note">Lege zuerst deinen aktuellen Standort an.</p>{% endif %}
 <details class="site-tools" id="site-tools"><summary>Standorte verwalten</summary><div class="site-tools-content">
 {% if current_site %}<h3>Aktuellen Standort bearbeiten</h3><form method="post" action="{{ url_for('update_site') }}"><div class="grid"><div class="field"><label for="edit_street">Straße</label><input id="edit_street" name="street" value="{{ current_site.street }}" required></div><div class="field"><label for="edit_house_number">Hausnummer</label><input id="edit_house_number" name="house_number" value="{{ current_site.house_number }}" required></div></div><div class="form-foot"><button class="button secondary" type="submit">Adresse aktualisieren</button></div></form>{% endif %}
@@ -255,6 +257,44 @@ def delete(record_id):
     from flask import flash
     flash("Eintrag gelöscht.")
     return redirect(url_for("index"))
+
+@app.get("/export.xlsx")
+def export_xlsx():
+    site_id = session.get("current_site_id")
+    conn = db()
+    site = conn.execute("SELECT street, house_number FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
+    if site_id:
+        rows = conn.execute("SELECT " + ", ".join(key for key, _ in FIELDS) + " FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall()
+    else:
+        rows = []
+    conn.close()
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Netzwerk-Dokumentation"
+    sheet.append(["Standort"] + [label for _, label in FIELDS])
+    site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
+    for row in rows:
+        sheet.append([site_address] + [row[key] for key, _ in FIELDS])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="102B46")
+    for row in sheet.iter_rows(min_row=2):
+        for cell in row:
+            cell.data_type = "s"
+            cell.number_format = "@"
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    sheet.sheet_view.showGridLines = False
+    for column in sheet.columns:
+        letter = column[0].column_letter
+        width = max(len(str(cell.value or "")) for cell in column)
+        sheet.column_dimensions[letter].width = min(max(width + 2, 14), 42)
+
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return Response(output.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=netzwerk-dokumentation.xlsx"})
 
 @app.get("/export.csv")
 def export_csv():
