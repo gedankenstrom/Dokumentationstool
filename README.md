@@ -29,8 +29,10 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 ## Enthalten
 
 - Mehrere Standorte mit Straße und Hausnummer sowie optionaler IM-/VITKO-Nummer; jeder Access Point ist einem Standort zugeordnet
-- Die IM-/VITKO-Nummer ist eine Standortangabe und kein Geräte-Erfassungsfeld
-- CSV- und Excel-Export enthalten den Standort als zusätzliche Spalte
+- Die IM-/VITKO-Nummer ist eine Standortangabe und kein Geräte-Erfassungsfeld; iOS soll sie nicht automatisch als Telefonnummer verlinken
+- CSV- und Excel-Export enthalten den Standort als zusätzliche Spalte; die Exportdatei wird nach Straße, Hausnummer und optionaler IM-/VITKO-Nummer benannt
+- Beim Export kann zwischen direktem Download und Teilen gewählt werden; auf iPhone/iPad lässt sich die Datei über das Teilen-Menü zum Beispiel an Apple Mail übergeben
+- Für das Teilen-Menü ist HTTPS erforderlich; über eine reine HTTP-Adresse steht weiterhin der Download zur Verfügung
 - Excel-Export speichert Raum, MAC-Adresse und Seriennummer als Text, damit Excel sie nicht automatisch in Datum oder Zahlen umwandelt
 - Beim Löschen eines Standorts werden nach Bestätigung auch die zugeordneten Geräte gelöscht
 - AP-Modell aus vorhandenen Einträgen auswählen oder neue Modelle direkt hinzufügen; das zuletzt gespeicherte Modell wird je Standort vorausgewählt
