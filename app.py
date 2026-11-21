@@ -327,12 +327,24 @@ def update_site():
 @app.post("/save/<int:record_id>")
 def save(record_id=None):
     site_id = session.get("current_site_id")
-    if not site_id:
+    type_id = session.get("documentation_type_id")
+    if not site_id or not type_id:
         from flask import flash
-        flash("Bitte zuerst einen Standort auswählen.")
+        flash("Bitte zuerst Standort und Dokumentationsart auswählen.")
         return redirect(url_for("index"))
-    values = []
-    for key, _ in FIELDS:
+    conn = db()
+    doc_type = conn.execute("SELECT * FROM documentation_types WHERE id=?", (type_id,)).fetchone()
+    if not doc_type:
+        conn.close()
+        return redirect(url_for("index"))
+    fields, required_keys, custom_keys = get_fields(conn, type_id)
+    if not fields:
+        conn.close()
+        from flask import flash
+        flash("Diese Vorlage hat noch keine Felder. Bitte zuerst Felder hinzufügen.")
+        return redirect(url_for("manage_templates", type_id=type_id))
+    values = {}
+    for key, label in fields:
         if key == "ap_model":
             choice = request.form.get("ap_model_choice", "").strip()
             value = request.form.get("ap_model_new", "").strip() if choice == "__new__" else choice
@@ -342,19 +354,46 @@ def save(record_id=None):
             value = request.form.get("network_switch_device", "").strip()
         else:
             value = request.form.get(key, "").strip()
-        values.append(value)
-    if not values[0]:
+        values[key] = value
+    missing = [label for key, label in fields if key in required_keys and not values.get(key)]
+    if missing:
+        conn.close()
         from flask import flash
-        flash("Bitte ein AP-Modell auswählen oder eingeben.")
+        flash("Bitte Pflichtfelder ausfüllen: " + ", ".join(missing))
         return redirect(url_for("index"))
-    conn = db()
-    conn.execute("UPDATE sites SET default_ap_model=? WHERE id=?", (values[0], site_id))
+    existing = conn.execute("SELECT custom_data FROM access_points WHERE id=? AND site_id=? AND doc_type_id=?", (record_id,site_id,type_id)).fetchone() if record_id else None
+    custom_data = {}
+    if existing:
+        try:
+            custom_data = json.loads(existing["custom_data"] or "{}")
+        except (TypeError, ValueError):
+            custom_data = {}
+    base_keys = {key for key, _ in FIELDS}
+    updates = {}
+    for key, value in values.items():
+        if key in base_keys:
+            updates[key] = value
+        elif key in custom_keys:
+            custom_data[key] = value
+    if doc_type["name"] == "Access Point" and "ap_model" in values and values["ap_model"]:
+        conn.execute("UPDATE sites SET default_ap_model=? WHERE id=?", (values["ap_model"], site_id))
     if record_id:
-        conn.execute("UPDATE access_points SET " + ", ".join(f"{key}=?" for key, _ in FIELDS) + " WHERE id=? AND site_id=?", values + [record_id, site_id])
+        if not existing:
+            conn.close()
+            abort(404)
+        assignments = [key + "=?" for key in updates]
+        params = list(updates.values())
+        assignments.append("custom_data=?")
+        params.extend([json.dumps(custom_data, ensure_ascii=False),record_id,site_id,type_id])
+        conn.execute("UPDATE access_points SET " + ", ".join(assignments) + " WHERE id=? AND site_id=? AND doc_type_id=?", params)
         message = "Eintrag aktualisiert."
     else:
-        conn.execute("INSERT INTO access_points (" + ", ".join(key for key, _ in FIELDS) + ", site_id) VALUES (" + ", ".join("?" for _ in FIELDS) + ", ?)", values + [site_id])
-        message = "Gerät gespeichert."
+        insert_values = {key: "" for key, _ in FIELDS}
+        insert_values.update(updates)
+        keys = list(insert_values) + ["site_id","doc_type_id","custom_data"]
+        params = list(insert_values.values()) + [site_id,type_id,json.dumps(custom_data, ensure_ascii=False)]
+        conn.execute("INSERT INTO access_points (" + ", ".join(keys) + ") VALUES (" + ", ".join("?" for _ in keys) + ")", params)
+        message = "Eintrag gespeichert."
     conn.commit()
     conn.close()
     from flask import flash
@@ -367,19 +406,26 @@ def edit(record_id):
     if not site_id:
         abort(404)
     conn = db()
-    item = conn.execute("SELECT * FROM access_points WHERE id=? AND site_id=?", (record_id, site_id)).fetchone()
+    raw_item = conn.execute("SELECT * FROM access_points WHERE id=? AND site_id=?", (record_id,site_id)).fetchone()
+    if not raw_item:
+        conn.close()
+        abort(404)
+    session["documentation_type_id"] = raw_item["doc_type_id"]
+    type_id = raw_item["doc_type_id"]
+    current_type = conn.execute("SELECT * FROM documentation_types WHERE id=?", (type_id,)).fetchone()
+    fields, required_keys, custom_keys = get_fields(conn, type_id)
+    item = flatten_row(raw_item)
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
+    types = get_types(conn)
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
-    ap_model_custom = item is not None and item["ap_model"] not in models
+    ap_model_custom = bool(item.get("ap_model")) and item["ap_model"] not in models
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
-    preferred_model = current_site["default_ap_model"] if current_site else ""
-    total_devices = site_counts.get(site_id, 0)
-    rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall()
+    preferred_model = current_site["default_ap_model"] if current_site and current_type["name"]=="Access Point" else ""
+    total_devices = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=? AND doc_type_id=?", (site_id,type_id)).fetchone()[0]
+    rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE site_id=? AND doc_type_id=? ORDER BY id DESC", (site_id,type_id)).fetchall()]
     conn.close()
-    if not item or not current_site:
-        abort(404)
-    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices)
+    return render_template_string(PAGE, rows=rows, q="", fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
