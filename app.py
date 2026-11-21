@@ -271,6 +271,10 @@ def index():
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
     if site_id and not current_site:
         session.pop("current_site_id", None)
+    field_defaults = get_site_field_defaults(conn, current_site["id"] if current_site else None, type_id, remember_keys, current_type, current_site)
+    for field_key, default_value in field_defaults.items():
+        if default_value and field_key in suggestions:
+            suggestions[field_key] = sorted(set(suggestions[field_key] + [default_value]), key=str.casefold)[:100]
     preferred_model = current_site["default_ap_model"] if current_site and current_type["name"] == "Access Point" else ""
     total_devices = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=? AND doc_type_id=?", (current_site["id"], type_id)).fetchone()[0] if current_site else 0
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
@@ -290,7 +294,7 @@ def index():
                 params.extend([like] * len(clauses))
         rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE " + where + " ORDER BY id DESC", params).fetchall()]
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions)
+    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions, field_defaults=field_defaults)
 
 @app.post("/documentation-type/select")
 def select_documentation_type():
@@ -426,6 +430,10 @@ def save(record_id=None):
             custom_data[key] = value
     if doc_type["name"] == "Access Point" and "ap_model" in values and values["ap_model"]:
         conn.execute("UPDATE sites SET default_ap_model=? WHERE id=?", (values["ap_model"], site_id))
+    for field_key in remember_keys:
+        selected_value = values.get(field_key, "").strip()
+        if selected_value:
+            conn.execute("INSERT INTO site_field_defaults (site_id,type_id,field_key,value) VALUES (?,?,?,?) ON CONFLICT(site_id,type_id,field_key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP", (site_id,type_id,field_key,selected_value))
     if record_id:
         if not existing:
             conn.close()
@@ -472,6 +480,10 @@ def edit(record_id):
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     ap_model_custom = bool(item.get("ap_model")) and item["ap_model"] not in models
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
+    field_defaults = get_site_field_defaults(conn, site_id, type_id, remember_keys, current_type, current_site)
+    for field_key, default_value in field_defaults.items():
+        if default_value and field_key in suggestions:
+            suggestions[field_key] = sorted(set(suggestions[field_key] + [default_value]), key=str.casefold)[:100]
     preferred_model = current_site["default_ap_model"] if current_site and current_type["name"]=="Access Point" else ""
     total_devices = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=? AND doc_type_id=?", (site_id,type_id)).fetchone()[0]
     rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE site_id=? AND doc_type_id=? ORDER BY id DESC", (site_id,type_id)).fetchall()]
