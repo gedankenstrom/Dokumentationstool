@@ -214,7 +214,7 @@ def manage_templates():
                     field_key = "custom_" + slug + "_" + str(suffix)
                     existing = conn.execute("SELECT 1 FROM documentation_fields WHERE type_id=? AND field_key=?", (type_id, field_key)).fetchone()
                     suffix += 1
-                position = conn.execute("SELECT COALESCE(MAX(position),0)+1 FROM documentation_fields WHERE type_id=?", (type_id,)).fetchone()[0]
+                position = conn.execute("SELECT COALESCE(MAX(position),-1)+1 FROM documentation_fields WHERE type_id=?", (type_id,)).fetchone()[0]
                 conn.execute("INSERT INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom,remember_values) VALUES (?,?,?,?,1,?,1,?)", (type_id,field_key,label,1 if request.form.get("required") else 0,position,1 if request.form.get("remember_values") else 0))
                 conn.commit()
                 from flask import flash
