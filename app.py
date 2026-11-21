@@ -60,8 +60,12 @@ def db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         street TEXT NOT NULL,
         house_number TEXT NOT NULL,
+        default_ap_model TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
+    site_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sites)")}
+    if "default_ap_model" not in site_columns:
+        conn.execute("ALTER TABLE sites ADD COLUMN default_ap_model TEXT NOT NULL DEFAULT ''")
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(access_points)")}
     if "site_id" not in columns:
         conn.execute("ALTER TABLE access_points ADD COLUMN site_id INTEGER REFERENCES sites(id)")
@@ -91,7 +95,7 @@ PAGE = r'''<!doctype html>
 {% if sites %}<h3>Standorte löschen</h3><div class="site-admin-list">{% for s in sites %}{% set assigned = site_counts.get(s.id, 0) %}<div class="site-admin-row"><span>{{ s.street }} {{ s.house_number }} · {{ assigned }} {{ 'Gerät' if assigned==1 else 'Geräte' }}</span><form method="post" action="{{ url_for('delete_site', site_id=s.id) }}" onsubmit="return confirm('Standort und alle zugeordneten Geräte löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')"><button class="device-delete" type="submit">Standort &amp; Geräte löschen</button></form></div>{% endfor %}</div>{% endif %}
 </details></section>
 {% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else 'Access Point dokumentieren' }}</h2><form method="post" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
-{% for key,label in fields %}{% if key=='ap_model' %}<div class="field"><label for="ap_model_choice">{{ label }}</label><select id="ap_model_choice" name="ap_model_choice" onchange="toggleApModel()" required><option value="" disabled {% if not item and not ap_model_custom %}selected{% endif %}>AP-Modell auswählen …</option>{% for model in models %}<option value="{{ model }}" {% if item and item.ap_model==model %}selected{% endif %}>{{ model }}</option>{% endfor %}<option value="__new__" {% if ap_model_custom %}selected{% endif %}>Neues AP-Modell eingeben …</option></select><input id="ap_model_new" name="ap_model_new" value="{{ item.ap_model if item and ap_model_custom else '' }}" placeholder="z. B. UniFi U6 Pro" {% if not ap_model_custom %}hidden{% endif %} {% if ap_model_custom %}required{% endif %}></div>{% else %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else '' }}" {% if key=='mac_address' %}placeholder="z. B. AA:BB:CC:DD:EE:FF" autocapitalize="characters"{% elif key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %}></div>{% endif %}{% endfor %}
+{% for key,label in fields %}{% if key=='ap_model' %}<div class="field"><label for="ap_model_choice">{{ label }}</label><select id="ap_model_choice" name="ap_model_choice" onchange="toggleApModel()" required><option value="" disabled {% if not item and not preferred_model and not ap_model_custom %}selected{% endif %}>AP-Modell auswählen …</option>{% for model in models %}<option value="{{ model }}" {% if (item and item.ap_model==model) or (not item and preferred_model==model) %}selected{% endif %}>{{ model }}</option>{% endfor %}<option value="__new__" {% if ap_model_custom %}selected{% endif %}>Neues AP-Modell eingeben …</option></select><input id="ap_model_new" name="ap_model_new" value="{{ item.ap_model if item and ap_model_custom else '' }}" placeholder="z. B. UniFi U6 Pro" {% if not ap_model_custom %}hidden{% endif %} {% if ap_model_custom %}required{% endif %}></div>{% else %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else '' }}" {% if key=='mac_address' %}placeholder="z. B. AA:BB:CC:DD:EE:FF" autocapitalize="characters"{% elif key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %}></div>{% endif %}{% endfor %}
 </div><div class="form-foot"><button class="button" type="submit">{{ 'Änderungen speichern' if item else 'Eintrag speichern' }}</button>{% if item %}<a class="button secondary" href="{{ url_for('index') }}">Abbrechen</a>{% endif %}</div></form></section>{% else %}<section class="card"><h2>Geräte dokumentieren</h2><div class="empty">Wähle zuerst den Standort aus, an dem du gerade arbeitest.</div></section>{% endif %}
 <section class="card"><h2>Dokumentierte Geräte</h2>{% if current_site %}<p class="count">Standort: {{ current_site.street }} {{ current_site.house_number }}</p>{% endif %}<form class="searchrow" method="get"><input class="search" name="q" value="{{ q }}" placeholder="Suche: Modell, MAC, Raum, Switch …"><button class="button" type="submit">Suchen</button>{% if q %}<a class="button secondary" href="{{ url_for('index') }}">Zurücksetzen</a>{% endif %}</form><p class="count">{{ rows|length }} {{ 'Eintrag' if rows|length==1 else 'Einträge' }}{% if q %} für „{{ q }}“{% endif %}</p>
 {% if rows %}<div class="tablewrap desktop"><table><thead><tr>{% for key,label in fields %}<th>{{ label }}</th>{% endfor %}<th></th></tr></thead><tbody>{% for row in rows %}<tr>{% for key,label in fields %}<td>{{ row[key] or '–' }}</td>{% endfor %}<td class="actions-cell"><a class="link" href="{{ url_for('edit', record_id=row.id) }}">Bearbeiten</a> · <form style="display:inline" method="post" action="{{ url_for('delete', record_id=row.id) }}" onsubmit="return confirm('Diesen Eintrag löschen?')"><button class="link" style="border:0;background:none;padding:0;cursor:pointer" type="submit">Löschen</button></form></td></tr>{% endfor %}</tbody></table></div>
@@ -104,12 +108,13 @@ def index():
     conn = db()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
-    models = [row["ap_model"] for row in conn.execute("SELECT DISTINCT ap_model FROM access_points WHERE TRIM(ap_model)<>'' ORDER BY ap_model COLLATE NOCASE")]
-    ap_model_custom = not models
+    models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     site_id = session.get("current_site_id")
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
     if site_id and not current_site:
         session.pop("current_site_id", None)
+    preferred_model = current_site["default_ap_model"] if current_site else ""
+    ap_model_custom = not models
     rows = []
     if current_site:
         if q:
@@ -119,7 +124,7 @@ def index():
         else:
             rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (current_site["id"],)).fetchall()
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom)
+    return render_template_string(PAGE, rows=rows, q=q, fields=FIELDS, item=None, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model)
 
 @app.post("/sites/select")
 def select_site():
@@ -207,6 +212,7 @@ def save(record_id=None):
         flash("Bitte ein AP-Modell auswählen oder eingeben.")
         return redirect(url_for("index"))
     conn = db()
+    conn.execute("UPDATE sites SET default_ap_model=? WHERE id=?", (values[0], site_id))
     if record_id:
         conn.execute("UPDATE access_points SET " + ", ".join(f"{key}=?" for key, _ in FIELDS) + " WHERE id=? AND site_id=?", values + [record_id, site_id])
         message = "Eintrag aktualisiert."
@@ -228,14 +234,15 @@ def edit(record_id):
     item = conn.execute("SELECT * FROM access_points WHERE id=? AND site_id=?", (record_id, site_id)).fetchone()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
-    models = [row["ap_model"] for row in conn.execute("SELECT DISTINCT ap_model FROM access_points WHERE TRIM(ap_model)<>'' ORDER BY ap_model COLLATE NOCASE")]
+    models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     ap_model_custom = item is not None and item["ap_model"] not in models
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
+    preferred_model = current_site["default_ap_model"] if current_site else ""
     rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall()
     conn.close()
     if not item or not current_site:
         abort(404)
-    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom)
+    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
