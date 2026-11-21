@@ -99,6 +99,10 @@ def db():
     field_columns = {row["name"] for row in conn.execute("PRAGMA table_info(documentation_fields)")}
     if "remember_values" not in field_columns:
         conn.execute("ALTER TABLE documentation_fields ADD COLUMN remember_values INTEGER NOT NULL DEFAULT 0")
+    conn.execute("CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)")
+    if not conn.execute("SELECT 1 FROM app_migrations WHERE name='ap_model_uses_managed_dropdown'").fetchone():
+        conn.execute("UPDATE documentation_fields SET remember_values=1 WHERE type_id=? AND field_key='ap_model'", (ap_type_id,))
+        conn.execute("INSERT INTO app_migrations (name) VALUES ('ap_model_uses_managed_dropdown')")
     conn.execute("UPDATE access_points SET doc_type_id=? WHERE doc_type_id IS NULL", (ap_type_id,))
     conn.commit()
     return conn
@@ -113,7 +117,7 @@ def get_fields(conn, type_id):
 
 
 def get_remember_fields(conn, type_id):
-    return {row["field_key"] for row in conn.execute("SELECT field_key FROM documentation_fields WHERE type_id=? AND enabled=1 AND remember_values=1 AND field_key!='ap_model'", (type_id,))}
+    return {row["field_key"] for row in conn.execute("SELECT field_key FROM documentation_fields WHERE type_id=? AND enabled=1 AND remember_values=1", (type_id,))}
 
 def get_field_suggestions(conn, type_id, keys):
     values = {key: set() for key in keys}
