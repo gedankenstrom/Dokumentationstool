@@ -1,48 +1,41 @@
 # Netzwerk-Dokumentation
 
-Responsives Webtool zur Dokumentation von Access Points. Funktioniert auf Smartphones, Tablets und Desktopgeräten. Daten werden in einer SQLite-Datenbank im persistenten Docker-Volume gespeichert.
+Responsives Webtool zur Dokumentation von Access Points. Funktioniert auf Smartphones, Tablets und Desktopgeräten. Die Daten werden dauerhaft in einem Docker-Volume gespeichert.
 
 ## In Portainer als Stack starten
 
 1. In Portainer **Stacks** öffnen und **Add stack** wählen.
-2. Einen Stack-Namen vergeben, zum Beispiel `netzwerk-doku`.
-3. Als Build-Methode **Git Repository** auswählen.
-4. Repository URL: `https://github.com/gedankenstrom/Dokumentationstool`
-5. Reference: `refs/heads/main`
-6. Compose path: `docker-compose.yml`
-7. **Deploy the stack** auswählen.
+2. Einen Stack-Namen vergeben, zum Beispiel `dokumentationstool`.
+3. **Web editor** auswählen und den Inhalt von `docker-compose.yml` einfügen. Alternativ bei **Git Repository** dieses Repository und `docker-compose.yml` als Compose path auswählen.
+4. **Deploy the stack** wählen.
 
-Portainer lädt das Repository, baut das Image mit dem enthaltenen Dockerfile und startet den Container. Das Volume `netzwerk-daten` hält die Einträge bei einem Neustart oder einer Neuerstellung des Containers dauerhaft vor.
+Der Stack lädt `ghcr.io/gedankenstrom/dokumentationstool:latest` und veröffentlicht die Weboberfläche auf Port **8085**. Im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:8085`.
 
-Nach dem Start im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:5000`.
+Das Volume `dokumentation-daten` enthält die Datenbank und bleibt bei Container-Neustarts erhalten.
 
-### Anderen Port verwenden
+## GitHub Container Registry
 
-Wenn Port 5000 schon belegt ist, in den Stack-Umgebungsvariablen `WEB_PORT` auf einen freien Port setzen, zum Beispiel `8085`. Dann lautet die Adresse `http://<IP-Adresse-des-Docker-Hosts>:8085`.
+GitHub Actions baut das Image bei jedem Push auf `main` und veröffentlicht es in GHCR. Beim ersten Veröffentlichen ist das Container-Paket möglicherweise privat. Damit Portainer das Image ohne Registry-Anmeldung laden kann:
 
-### Smartphone-Zugriff
+1. Auf GitHub das Repository öffnen und unter **Packages** das Paket `dokumentationstool` auswählen.
+2. In den Paket-Einstellungen die Sichtbarkeit auf **Public** setzen.
+3. Danach den Stack in Portainer deployen oder mit **Pull and redeploy** aktualisieren.
 
-iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Die Anwendung ist dann über die IP-Adresse des Hosts erreichbar. Für Zugriff von außerhalb des lokalen Netzwerks VPN oder einen HTTPS-Reverse-Proxy verwenden.
+## Smartphone-Zugriff
 
-## Lokal mit Docker Compose starten
-
-```sh
-docker compose up -d --build
-```
-
-Danach `http://localhost:5000` öffnen.
+iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende die IP-Adresse des Hosts mit Port 8085. Für Zugriff von außerhalb des lokalen Netzwerks VPN oder HTTPS-Reverse-Proxy verwenden.
 
 ## Enthalten
 
 - AP Modell, Seriennummer, MAC Adresse, Datenverteiler, Datendose / Port, Switch, Switch Port und Raum
 - Einträge anlegen, bearbeiten, löschen und durchsuchen
 - CSV-Export mit Semikolon als Trennzeichen
-- Persistente Speicherung im Volume `netzwerk-daten`
+- Persistente Speicherung im Docker-Volume `dokumentation-daten`
 
 ## Datensicherung
 
-Das Docker-Volume heißt in Docker `<stackname>_netzwerk-daten` (bei Stackname `netzwerk-doku` also üblicherweise `netzwerk-doku_netzwerk-daten`). Ein Backup-Beispiel, wenn es als `netzwerk-doku_netzwerk-daten` angelegt wurde:
+Docker benennt das Volume mit einem Präfix aus dem Stack-Namen, zum Beispiel `dokumentationstool_dokumentation-daten`. Backup-Beispiel:
 
 ```sh
-docker run --rm -v netzwerk-doku_netzwerk-daten:/data -v "$PWD":/backup alpine tar czf /backup/netzwerk-daten.tar.gz -C /data .
+docker run --rm -v dokumentationstool_dokumentation-daten:/data -v "$PWD":/backup alpine tar czf /backup/dokumentation-daten.tar.gz -C /data .
 ```
