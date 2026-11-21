@@ -219,12 +219,13 @@ def edit(record_id):
     conn = db()
     item = conn.execute("SELECT * FROM access_points WHERE id=? AND site_id=?", (record_id, site_id)).fetchone()
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
+    site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
     current_site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
     rows = conn.execute("SELECT * FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall()
     conn.close()
     if not item or not current_site:
         abort(404)
-    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site)
+    return render_template_string(PAGE, rows=rows, q="", fields=FIELDS, item=item, sites=sites, current_site=current_site, site_counts=site_counts)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
