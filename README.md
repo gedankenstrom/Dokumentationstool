@@ -38,7 +38,8 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 - Dokumentationsvorlagen in der Weboberfläche erstellen und verwalten, zum Beispiel für Access Points, Datendosen oder Switches
 - Je Vorlage eigene Felder anlegen, umbenennen, ein- oder ausblenden, als Pflichtfeld markieren und sortieren
 - Für Textfelder optional „Auswahl merken“ aktivieren; bereits eingegebene Werte derselben Dokumentationsart erscheinen dann im Dropdown; eigene Werte lassen sich weiterhin ergänzen
-- Die bestehende Access-Point-Erfassung bleibt als Vorlage erhalten; vorhandene Einträge bleiben bei Änderungen erhalten
+- Die bestehende Access-Point-Erfassung bleibt als Vorlage erhalten; auch ihre Felder lassen sich im Editor wie bei anderen Vorlagen bearbeiten. Für das AP-Modell ist das Dropdown mit bisherigen Werten optional
+- Vorhandene Einträge bleiben bei Änderungen an Vorlagen erhalten
 - CSV- und Excel-Export verwenden die Felder und Bezeichnungen der ausgewählten Vorlage
 - AP-Modell aus vorhandenen Einträgen auswählen oder neue Modelle direkt hinzufügen; das zuletzt gespeicherte Modell wird je Standort vorausgewählt
 - Bluetooth-Tastaturscanner: Enter springt zum nächsten Feld und speichert den Datensatz nicht automatisch
