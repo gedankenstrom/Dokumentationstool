@@ -442,25 +442,24 @@ def delete(record_id):
 @app.get("/export.xlsx")
 def export_xlsx():
     site_id = session.get("current_site_id")
+    type_id = session.get("documentation_type_id")
     conn = db()
     site = conn.execute("SELECT street, house_number, inventory_number FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
-    if site_id:
-        rows = conn.execute("SELECT " + ", ".join(key for key, _ in FIELDS) + " FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall()
-    else:
-        rows = []
+    doc_type = conn.execute("SELECT * FROM documentation_types WHERE id=?", (type_id,)).fetchone() if type_id else None
+    fields, _, custom_keys = get_fields(conn, type_id) if doc_type else ([],set(),set())
+    rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE site_id=? AND doc_type_id=? ORDER BY id DESC", (site_id,type_id)).fetchall()] if site_id and doc_type else []
     conn.close()
-
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = "Netzwerk-Dokumentation"
-    sheet.append(["Standort"] + [label for _, label in FIELDS])
+    sheet.title = "Dokumentation"
+    sheet.append(["Standort"] + [label for _, label in fields])
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
-    site_filename = secure_filename(" ".join(part for part in [site["street"], site["house_number"], site["inventory_number"]] if part).strip()) if site else "netzwerk-dokumentation"
+    site_filename = secure_filename(" ".join(part for part in [site["street"],site["house_number"],site["inventory_number"],doc_type["name"] if doc_type else ""] if part).strip()) if site else "netzwerk-dokumentation"
     for row in rows:
-        sheet.append([site_address] + [row[key] for key, _ in FIELDS])
+        sheet.append([site_address] + [row.get(key,"") for key,_ in fields])
     for cell in sheet[1]:
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="102B46")
+        cell.font = Font(bold=True,color="FFFFFF")
+        cell.fill = PatternFill("solid",fgColor="102B46")
     for row in sheet.iter_rows(min_row=2):
         for cell in row:
             cell.data_type = "s"
@@ -471,30 +470,29 @@ def export_xlsx():
     for column in sheet.columns:
         letter = column[0].column_letter
         width = max(len(str(cell.value or "")) for cell in column)
-        sheet.column_dimensions[letter].width = min(max(width + 2, 14), 42)
-
+        sheet.column_dimensions[letter].width = min(max(width + 2,14),42)
     output = io.BytesIO()
     workbook.save(output)
     output.seek(0)
-    return Response(output.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{site_filename}.xlsx"'})
+    return Response(output.getvalue(),mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{site_filename}.xlsx"'})
 
 @app.get("/export.csv")
 def export_csv():
     site_id = session.get("current_site_id")
+    type_id = session.get("documentation_type_id")
     conn = db()
     site = conn.execute("SELECT street, house_number, inventory_number FROM sites WHERE id=?", (site_id,)).fetchone() if site_id else None
-    if site_id:
-        rows = conn.execute("SELECT " + ", ".join(key for key, _ in FIELDS) + " FROM access_points WHERE site_id=? ORDER BY id DESC", (site_id,)).fetchall()
-    else:
-        rows = []
+    doc_type = conn.execute("SELECT * FROM documentation_types WHERE id=?", (type_id,)).fetchone() if type_id else None
+    fields, _, custom_keys = get_fields(conn, type_id) if doc_type else ([],set(),set())
+    rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE site_id=? AND doc_type_id=? ORDER BY id DESC", (site_id,type_id)).fetchall()] if site_id and doc_type else []
     conn.close()
     output = io.StringIO(newline="")
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Standort"] + [label for _, label in FIELDS])
+    writer = csv.writer(output,delimiter=";")
+    writer.writerow(["Standort"] + [label for _,label in fields])
     site_address = f"{site['street']} {site['house_number']}".strip() if site else ""
-    site_filename = secure_filename(" ".join(part for part in [site["street"], site["house_number"], site["inventory_number"]] if part).strip()) if site else "netzwerk-dokumentation"
-    writer.writerows([site_address] + [row[key] for key, _ in FIELDS] for row in rows)
-    return Response("\ufeff" + output.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{site_filename}.csv"'})
+    site_filename = secure_filename(" ".join(part for part in [site["street"],site["house_number"],site["inventory_number"],doc_type["name"] if doc_type else ""] if part).strip()) if site else "netzwerk-dokumentation"
+    writer.writerows([site_address] + [row.get(key,"") for key,_ in fields] for row in rows)
+    return Response("\ufeff"+output.getvalue(),mimetype="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="{site_filename}.csv"'})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8086)
