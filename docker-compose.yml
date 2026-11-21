@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     pull_policy: always
     ports:
-      - "8085:8085"
+      - "8086:8086"
     volumes:
       - dokumentation-daten:/data
 
