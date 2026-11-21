@@ -80,7 +80,7 @@ def db():
         if old_site or old_count:
             street = old_site["street"] if old_site else ""
             house_number = old_site["house_number"] if old_site else ""
-            cursor = conn.execute("INSERT INTO sites (street, house_number, inventory_number) VALUES (?, ?, ?)", (street, house_number, inventory_number))
+            cursor = conn.execute("INSERT INTO sites (street, house_number) VALUES (?, ?)", (street, house_number))
             conn.execute("UPDATE access_points SET site_id=? WHERE site_id IS NULL", (cursor.lastrowid,))
     return conn
 
@@ -156,7 +156,7 @@ def create_site():
         flash("Bitte Straße und Hausnummer eintragen.")
         return redirect(url_for("index"))
     conn = db()
-    cursor = conn.execute("INSERT INTO sites (street, house_number) VALUES (?, ?)", (street, house_number))
+    cursor = conn.execute("INSERT INTO sites (street, house_number, inventory_number) VALUES (?, ?, ?)", (street, house_number, inventory_number))
     conn.commit()
     session["current_site_id"] = cursor.lastrowid
     conn.close()
