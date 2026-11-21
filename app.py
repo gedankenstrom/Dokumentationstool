@@ -527,28 +527,31 @@ def export_xlsx():
     sheet = workbook.active
     sheet.title = "Gesamtexport"
     sheet.sheet_view.showGridLines = False
+    current_row = 1
     for doc_type in types:
         fields = fields_by_type[doc_type["id"]]
-        section_row = sheet.max_row + 1
-        sheet.append(["Dokumentationsart: " + doc_type["name"]] + [""] * (max_columns - 1))
-        for cell in sheet[section_row]:
+        section_label = "Dokumentationsart: " + doc_type["name"]
+        for column_index in range(1,max_columns+1):
+            cell = sheet.cell(row=current_row,column=column_index,value=section_label if column_index==1 else "")
             cell.fill = PatternFill("solid",fgColor="087F8C")
             cell.font = Font(bold=True,color="FFFFFF")
+        current_row += 1
         headers = ["Standort","IM-/VITKO-Nummer","Dokumentationsart"] + [label for _,label in fields]
-        header_row = sheet.max_row + 1
-        sheet.append(headers)
-        for cell in sheet[header_row]:
+        for column_index, value in enumerate(headers,1):
+            cell = sheet.cell(row=current_row,column=column_index,value=value)
             cell.font = Font(bold=True,color="FFFFFF")
             cell.fill = PatternFill("solid",fgColor="102B46")
-        type_records = [row for row in records if row.get("doc_type_id")==doc_type["id"]]
-        for row in type_records:
+        current_row += 1
+        for row in records:
+            if row.get("doc_type_id") != doc_type["id"]:
+                continue
             values = [site_address,inventory_number,doc_type["name"]] + [row.get(key,"") for key,_ in fields]
-            sheet.append(values)
-            for cell in sheet[sheet.max_row]:
+            for column_index, value in enumerate(values,1):
+                cell = sheet.cell(row=current_row,column=column_index,value=value)
                 cell.data_type = "s"
                 cell.number_format = "@"
-        sheet.append([""])
-    sheet.delete_rows(1,1)
+            current_row += 1
+        current_row += 1
     for column in sheet.columns:
         letter = column[0].column_letter
         width = max(len(str(cell.value or "")) for cell in column)
