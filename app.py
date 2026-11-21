@@ -142,6 +142,71 @@ PAGE = r'''<!doctype html>
 <div class="mobile-list">{% for row in rows %}<article class="mobile-item"><div class="device-heading"><div class="device-title"><div class="device-model">{{ row.ap_model or 'Access Point' }}</div><div class="device-room">Raum · {{ row.room or 'Nicht angegeben' }}</div></div><a class="device-edit" href="{{ url_for('edit', record_id=row.id) }}">Bearbeiten</a></div><div class="device-grid"><div class="device-field"><span class="device-label">Seriennummer</span><span class="device-value">{{ row.serial_number or '–' }}</span></div><div class="device-field"><span class="device-label">MAC-Adresse</span><span class="device-value">{{ row.mac_address or '–' }}</span></div><div class="device-field"><span class="device-label">Datenverteiler</span><span class="device-value">{{ row.distribution or '–' }}</span></div><div class="device-field"><span class="device-label">Datendose / Port</span><span class="device-value">{{ row.outlet_port or '–' }}</span></div><div class="device-field"><span class="device-label">Switch</span><span class="device-value">{{ row.switch_name or '–' }}</span></div><div class="device-field"><span class="device-label">Switch Port</span><span class="device-value">{{ row.switch_port or '–' }}</span></div></div><form method="post" action="{{ url_for('delete', record_id=row.id) }}" onsubmit="return confirm('Diesen Eintrag löschen?')"><button class="device-delete" type="submit">Eintrag löschen</button></form></article>{% endfor %}</div>
 {% else %}<div class="empty">{% if q %}Keine passenden Einträge gefunden.{% else %}Noch keine Geräte eingetragen. Lege den ersten Eintrag oben an.{% endif %}</div>{% endif %}<p class="note">Die Daten werden lokal in einer SQLite-Datei im Docker-Datenvolume gespeichert.</p></section></main><dialog id="export-dialog" style="border:0;border-radius:16px;padding:22px;max-width:calc(100% - 28px);width:420px;box-shadow:0 18px 60px #102b4633"><h2 style="margin:0 0 8px">Export teilen</h2><p id="export-status" class="note">Export wird vorbereitet …</p><div class="form-foot"><a id="export-download" class="button secondary" href="#" download>Herunterladen</a><button id="export-share" class="button" type="button" disabled>Per E-Mail / Teilen</button></div><div class="form-foot"><button id="export-close" class="button secondary" type="button">Schließen</button></div></dialog><script>const exportDialog=document.getElementById('export-dialog');let exportFile=null,exportObjectUrl=null;document.querySelectorAll('.export-choice').forEach(button=>button.addEventListener('click',async()=>{exportFile=null;if(exportObjectUrl)URL.revokeObjectURL(exportObjectUrl);exportObjectUrl=null;const status=document.getElementById('export-status'),download=document.getElementById('export-download'),share=document.getElementById('export-share');download.removeAttribute('href');share.disabled=true;status.textContent='Export wird vorbereitet …';exportDialog.showModal();try{const response=await fetch(button.dataset.url);if(!response.ok)throw new Error();const blob=await response.blob();const disposition=response.headers.get('Content-Disposition')||'';const match=disposition.match(/filename="?([^";]+)"?/i);const filename=match?match[1]:'netzwerk-dokumentation.'+button.dataset.type;exportFile=new File([blob],filename,{type:blob.type});exportObjectUrl=URL.createObjectURL(blob);download.href=exportObjectUrl;download.download=filename;share.disabled=false;status.textContent='Wähle Herunterladen oder öffne das Teilen-Menü und wähle Mail.'}catch(error){status.textContent='Der Export konnte nicht vorbereitet werden. Bitte Seite neu laden und erneut versuchen.'}}));document.getElementById('export-share').addEventListener('click',async()=>{const status=document.getElementById('export-status');if(!exportFile)return;if(!window.isSecureContext||!navigator.share||!navigator.canShare||!navigator.canShare({files:[exportFile]})){status.textContent='Teilen mit Mail wird von diesem Browser hier nicht unterstützt. Öffne die Seite über HTTPS oder lade die Datei herunter und teile sie anschließend über die Dateien-App.';return}try{await navigator.share({files:[exportFile],title:exportFile.name})}catch(error){if(error.name!=='AbortError')status.textContent='Teilen wurde nicht abgeschlossen. Du kannst die Datei herunterladen.'}});document.getElementById('export-close').addEventListener('click',()=>exportDialog.close());exportDialog.addEventListener('close',()=>{if(exportObjectUrl)URL.revokeObjectURL(exportObjectUrl);exportObjectUrl=null});function toggleApModel(){const select=document.getElementById('ap_model_choice');const input=document.getElementById('ap_model_new');const custom=select.value==='__new__';input.hidden=!custom;input.required=custom;}const entryForm=document.querySelector('#entry form');if(entryForm){entryForm.addEventListener('keydown',function(event){if(event.key!=='Enter'||!event.target.matches('input:not([type="hidden"]):not([hidden])'))return;event.preventDefault();const fields=Array.from(entryForm.querySelectorAll('select:not([disabled]),input:not([type="hidden"]):not([hidden]),textarea'));const current=fields.indexOf(event.target);if(current>=0&&fields[current+1])fields[current+1].focus();});}</script></body></html>'''
 
+@app.route("/templates", methods=["GET", "POST"])
+def manage_templates():
+    conn = db()
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        type_id = request.form.get("type_id", "").strip()
+        if action == "create_type":
+            name = request.form.get("name", "").strip()
+            if name:
+                try:
+                    conn.execute("INSERT INTO documentation_types (name) VALUES (?)", (name,))
+                    conn.commit()
+                    from flask import flash
+                    flash("Dokumentationsvorlage angelegt. Füge jetzt die gewünschten Felder hinzu.")
+                except sqlite3.IntegrityError:
+                    from flask import flash
+                    flash("Diese Dokumentationsart gibt es bereits.")
+        elif action == "add_field" and type_id.isdigit():
+            label = request.form.get("label", "").strip()
+            if label:
+                slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "feld"
+                field_key = "custom_" + slug
+                existing = conn.execute("SELECT 1 FROM documentation_fields WHERE type_id=? AND field_key=?", (type_id, field_key)).fetchone()
+                suffix = 2
+                while existing:
+                    field_key = "custom_" + slug + "_" + str(suffix)
+                    existing = conn.execute("SELECT 1 FROM documentation_fields WHERE type_id=? AND field_key=?", (type_id, field_key)).fetchone()
+                    suffix += 1
+                position = conn.execute("SELECT COALESCE(MAX(position),0)+1 FROM documentation_fields WHERE type_id=?", (type_id,)).fetchone()[0]
+                conn.execute("INSERT INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom) VALUES (?,?,?,?,1,?,1)", (type_id,field_key,label,1 if request.form.get("required") else 0,position))
+                conn.commit()
+                from flask import flash
+                flash("Feld hinzugefügt.")
+        elif action == "update_field":
+            field_id = request.form.get("field_id", "").strip()
+            label = request.form.get("label", "").strip()
+            if field_id.isdigit() and label:
+                conn.execute("UPDATE documentation_fields SET label=?, required=?, enabled=?, position=? WHERE id=?", (label,1 if request.form.get("required") else 0,1 if request.form.get("enabled") else 0,int(request.form.get("position","0") or 0),field_id))
+                conn.commit()
+                from flask import flash
+                flash("Feld gespeichert.")
+        elif action == "delete_type" and type_id.isdigit():
+            doc_type = conn.execute("SELECT name FROM documentation_types WHERE id=?", (type_id,)).fetchone()
+            count = conn.execute("SELECT COUNT(*) FROM access_points WHERE doc_type_id=?", (type_id,)).fetchone()[0]
+            if doc_type and doc_type["name"] != "Access Point" and count == 0:
+                conn.execute("DELETE FROM documentation_fields WHERE type_id=?", (type_id,))
+                conn.execute("DELETE FROM documentation_types WHERE id=?", (type_id,))
+                conn.commit()
+                from flask import flash
+                flash("Dokumentationsvorlage gelöscht.")
+            else:
+                from flask import flash
+                flash("Diese Vorlage kann nicht gelöscht werden, solange Einträge vorhanden sind oder es die Access-Point-Vorlage ist.")
+        conn.close()
+        return redirect(url_for("manage_templates", type_id=type_id or request.args.get("type_id", "")))
+    types = get_types(conn)
+    selected_id = request.args.get("type_id", "").strip()
+    selected = conn.execute("SELECT * FROM documentation_types WHERE id=?", (selected_id,)).fetchone() if selected_id.isdigit() else None
+    if not selected and types:
+        selected = types[0]
+    fields = conn.execute("SELECT * FROM documentation_fields WHERE type_id=? ORDER BY position,id", (selected["id"],)).fetchall() if selected else []
+    type_counts = {row["doc_type_id"]: row["total"] for row in conn.execute("SELECT doc_type_id,COUNT(*) AS total FROM access_points GROUP BY doc_type_id")}
+    conn.close()
+    return render_template_string(r'''<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vorlagen verwalten</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f2f6f9;color:#172b3a;margin:0}main{max-width:850px;margin:22px auto;padding:0 14px}.card{background:white;border:1px solid #e0e8ee;border-radius:14px;padding:18px;margin-bottom:14px}h1{font-size:1.4rem}.field{display:grid;grid-template-columns:minmax(120px,1fr) 2fr auto auto auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid #e7edf1}.field input[type=text],input[type=number]{min-width:0;padding:9px;border:1px solid #cad8e1;border-radius:8px;font:inherit}.btn{display:inline-block;border:0;border-radius:8px;padding:10px 13px;background:#087f8c;color:white;text-decoration:none;font-weight:700;cursor:pointer}.secondary{background:#eaf0f4;color:#28485a}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.note{color:#617988;font-size:.9rem}.flash{background:#e7f5f2;padding:10px;border-radius:8px;margin-bottom:10px}@media(max-width:650px){.field{grid-template-columns:1fr 1fr}.field label{grid-column:span 2}.field input[type=text]{grid-column:span 2}}</style></head><body><main><h1>Dokumentationsvorlagen</h1>{% with messages=get_flashed_messages() %}{% if messages %}<div class="flash">{{ messages[0] }}</div>{% endif %}{% endwith %}<p><a class="btn secondary" href="{{ url_for('index') }}">← Zur Erfassung</a></p><section class="card"><h2>Vorlagen auswählen</h2><div class="row">{% for t in types %}<a class="btn {{ 'secondary' if selected and selected.id==t.id else '' }}" href="{{ url_for('manage_templates',type_id=t.id) }}">{{ t.name }} · {{ type_counts.get(t.id,0) }}</a>{% endfor %}</div></section><section class="card"><h2>Neue Dokumentationsart</h2><form class="row" method="post"><input type="hidden" name="action" value="create_type"><input name="name" placeholder="z. B. Datendose" required><button class="btn" type="submit">Vorlage anlegen</button></form><p class="note">Neue Vorlagen starten ohne Felder. So kannst du sie passend zur Dokumentationsart zusammenstellen.</p></section>{% if selected %}<section class="card"><h2>Felder: {{ selected.name }}</h2>{% if fields %}{% for f in fields %}<form class="field" method="post"><input type="hidden" name="action" value="update_field"><input type="hidden" name="type_id" value="{{ selected.id }}"><input type="hidden" name="field_id" value="{{ f.id }}"><label><input name="enabled" type="checkbox" value="1" {% if f.enabled %}checked{% endif %}> Anzeigen</label><input name="label" type="text" value="{{ f.label }}" required><label><input name="required" type="checkbox" value="1" {% if f.required %}checked{% endif %}> Pflicht</label><input name="position" type="number" value="{{ f.position }}" title="Reihenfolge"><button class="btn" type="submit">Speichern</button></form>{% endfor %}{% else %}<p class="note">Noch keine Felder angelegt.</p>{% endif %}<h3>Feld hinzufügen</h3><form class="row" method="post"><input type="hidden" name="action" value="add_field"><input type="hidden" name="type_id" value="{{ selected.id }}"><input name="label" placeholder="Feldname, z. B. VLAN" required><label><input type="checkbox" name="required" value="1"> Pflichtfeld</label><button class="btn" type="submit">Hinzufügen</button></form>{% if selected.name != 'Access Point' and not type_counts.get(selected.id,0) %}<form method="post" onsubmit="return confirm('Vorlage löschen?')"><input type="hidden" name="action" value="delete_type"><input type="hidden" name="type_id" value="{{ selected.id }}"><button class="btn secondary" type="submit">Vorlage löschen</button></form>{% endif %}</section>{% endif %}</main></body></html>''', types=types, selected=selected, fields=fields, type_counts=type_counts)
+
 @app.get("/")
 def index():
     q = request.args.get("q", "").strip()
