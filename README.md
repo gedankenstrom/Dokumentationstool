@@ -33,6 +33,7 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 - Excel-Export speichert Raum, MAC-Adresse und Seriennummer als Text, damit Excel sie nicht automatisch in Datum oder Zahlen umwandelt
 - Beim Löschen eines Standorts werden nach Bestätigung auch die zugeordneten Geräte gelöscht
 - AP-Modell aus vorhandenen Einträgen auswählen oder neue Modelle direkt hinzufügen; das zuletzt gespeicherte Modell wird je Standort vorausgewählt
+- Bluetooth-Tastaturscanner: Enter springt zum nächsten Feld und speichert den Datensatz nicht automatisch
 - Seriennummer, MAC-Adresse, Datenverteiler, Datendose / Port, Switch, Switch-Port und Raum
 - Einträge anlegen, bearbeiten, löschen und durchsuchen
 - CSV-Export mit Semikolon als Trennzeichen
