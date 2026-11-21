@@ -3,7 +3,9 @@ from werkzeug.utils import secure_filename
 import csv
 import fcntl
 import io
+import json
 import os
+import re
 import sqlite3
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -83,7 +85,36 @@ def db():
             house_number = old_site["house_number"] if old_site else ""
             cursor = conn.execute("INSERT INTO sites (street, house_number) VALUES (?, ?)", (street, house_number))
             conn.execute("UPDATE access_points SET site_id=? WHERE site_id IS NULL", (cursor.lastrowid,))
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(access_points)")}
+    if "doc_type_id" not in columns:
+        conn.execute("ALTER TABLE access_points ADD COLUMN doc_type_id INTEGER")
+    if "custom_data" not in columns:
+        conn.execute("ALTER TABLE access_points ADD COLUMN custom_data TEXT NOT NULL DEFAULT '{}'")
+    conn.execute("CREATE TABLE IF NOT EXISTS documentation_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
+    conn.execute("CREATE TABLE IF NOT EXISTS documentation_fields (id INTEGER PRIMARY KEY AUTOINCREMENT, type_id INTEGER NOT NULL REFERENCES documentation_types(id) ON DELETE CASCADE, field_key TEXT NOT NULL, label TEXT NOT NULL, required INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, is_custom INTEGER NOT NULL DEFAULT 0, UNIQUE(type_id, field_key))")
+    conn.execute("INSERT OR IGNORE INTO documentation_types (name) VALUES ('Access Point')")
+    ap_type_id = conn.execute("SELECT id FROM documentation_types WHERE name='Access Point'").fetchone()[0]
+    for position, (field_key, label) in enumerate(FIELDS):
+        conn.execute("INSERT OR IGNORE INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom) VALUES (?,?,?,?,?,?,0)", (ap_type_id,field_key,label,1 if field_key=='ap_model' else 0,1,position))
+    conn.execute("UPDATE access_points SET doc_type_id=? WHERE doc_type_id IS NULL", (ap_type_id,))
+    conn.commit()
     return conn
+
+
+def get_types(conn):
+    return conn.execute("SELECT * FROM documentation_types ORDER BY id").fetchall()
+
+def get_fields(conn, type_id):
+    rows = conn.execute("SELECT field_key,label,required,is_custom FROM documentation_fields WHERE type_id=? AND enabled=1 ORDER BY position,id", (type_id,)).fetchall()
+    return [(row["field_key"], row["label"]) for row in rows], {row["field_key"] for row in rows if row["required"]}, {row["field_key"] for row in rows if row["is_custom"]}
+
+def flatten_row(row):
+    data = dict(row)
+    try:
+        data.update(json.loads(data.get("custom_data") or "{}"))
+    except (TypeError, ValueError):
+        pass
+    return data
 
 PAGE = r'''<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#102b46"><meta name="format-detection" content="telephone=no"><title>Netzwerk-Dokumentation</title>
