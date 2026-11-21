@@ -8,7 +8,7 @@ Responsives Webtool zur Dokumentation von Access Points an mehreren Standorten. 
 2. Einen Stack-Namen vergeben, zum Beispiel `dokumentationstool`.
 3. **Web editor** auswählen und den Inhalt von `docker-compose.yml` einfügen. Alternativ bei **Git Repository** dieses Repository und `docker-compose.yml` als Compose path auswählen.
 4. **Deploy the stack** wählen.
-5. In der Weboberfläche zuerst Straße und Hausnummer als Standort anlegen. Der neue Standort wird direkt ausgewählt; danach können die Access Points dafür eingetragen werden. Für weitere Gebäude legst du einen weiteren Standort an und wechselst über die Standortauswahl.
+5. In der Weboberfläche zuerst Straße und Hausnummer als Standort anlegen. Optional kann zusätzlich eine IM- oder VITKO-Nummer hinterlegt werden. Der neue Standort wird direkt ausgewählt; danach können die Access Points dafür eingetragen werden. Für weitere Gebäude legst du einen weiteren Standort an und wechselst über die Standortauswahl.
 
 Der Stack lädt `ghcr.io/gedankenstrom/dokumentationstool:latest` und veröffentlicht die Weboberfläche auf Port **8086**. Im Browser öffnen: `http://<IP-Adresse-des-Docker-Hosts>:8086`.
 
@@ -28,7 +28,8 @@ iPhone und Android müssen im selben Netzwerk wie der Docker-Host sein. Verwende
 
 ## Enthalten
 
-- Mehrere Standorte mit jeweils Straße und Hausnummer; jeder Access Point ist einem Standort zugeordnet
+- Mehrere Standorte mit Straße und Hausnummer sowie optionaler IM-/VITKO-Nummer; jeder Access Point ist einem Standort zugeordnet
+- Die IM-/VITKO-Nummer ist eine Standortangabe und kein Geräte-Erfassungsfeld
 - CSV- und Excel-Export enthalten den Standort als zusätzliche Spalte
 - Excel-Export speichert Raum, MAC-Adresse und Seriennummer als Text, damit Excel sie nicht automatisch in Datum oder Zahlen umwandelt
 - Beim Löschen eines Standorts werden nach Bestätigung auch die zugeordneten Geräte gelöscht
