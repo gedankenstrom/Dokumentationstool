@@ -146,6 +146,66 @@ def test_custom_template_required_field_and_exports(client):
     assert "02. Okt" in values
 
 
+def test_followup_device_inherits_v_and_rq_numbers(client):
+    create_site(client)
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "V Nummer")
+    add_field(client, notebook_type, "RQ Nummer")
+
+    client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
+    response = client.post(
+        "/save",
+        data={
+            "custom_v_nummer": "V-123",
+            "custom_rq_nummer": "NB-123",
+            "continue_followup": "1",
+        },
+    )
+    assert response.status_code == 302
+    notebook = rows(
+        "SELECT custom_data FROM access_points WHERE doc_type_id=?",
+        (notebook_type,),
+    )[0]
+    assert json.loads(notebook["custom_data"]) == {
+        "custom_v_nummer": "V-123",
+        "custom_rq_nummer": "NB-123",
+    }
+    with client.session_transaction() as session:
+        assert session["followup_context"] == {
+            "v_number": "V-123",
+            "rq_number": "NB-123",
+        }
+
+    monitor_type = create_type(client, "Monitor")
+    add_field(client, monitor_type, "V Nummer")
+    add_field(client, monitor_type, "RQ Nummer")
+    client.post("/documentation-type/select", data={"type_id": str(monitor_type)})
+
+    page = client.get("/").get_data(as_text=True)
+    assert 'name="custom_v_nummer" value="V-123"' in page
+    assert 'name="custom_rq_nummer" value="NB-123"' in page
+    assert "Weiteres Gerät für diesen Anwender dokumentieren" in page
+
+    response = client.post(
+        "/save",
+        data={
+            "custom_v_nummer": "V-123",
+            "custom_rq_nummer": "NB-123",
+        },
+    )
+    assert response.status_code == 302
+    monitor = rows(
+        "SELECT custom_data FROM access_points WHERE doc_type_id=?",
+        (monitor_type,),
+    )[0]
+    assert json.loads(monitor["custom_data"]) == {
+        "custom_v_nummer": "V-123",
+        "custom_rq_nummer": "NB-123",
+    }
+    with client.session_transaction() as session:
+        assert "followup_context" not in session
+
+
 def test_deleting_site_removes_devices_and_remembered_values(client):
     site_id = create_site(client)
     response = client.post("/save", data=ap_payload())
