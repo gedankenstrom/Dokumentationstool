@@ -148,17 +148,26 @@ def test_custom_template_required_field_and_exports(client):
 
 def test_followup_device_inherits_v_and_rq_numbers(client):
     create_site(client)
+    monitor_type = create_type(client, "Monitor")
+    add_field(client, monitor_type, "V Nummer")
+    add_field(client, monitor_type, "RQ Nummer")
+
     notebook_type = create_type(client, "Notebook")
     add_field(client, notebook_type, "V Nummer")
     add_field(client, notebook_type, "RQ Nummer")
-
     client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
+
+    response = client.get("/").get_data(as_text=True)
+    assert "Welche Dokumentationsart folgt?" in response
+    assert f'<option value="{monitor_type}">Monitor</option>' in response
+
     response = client.post(
         "/save",
         data={
             "custom_v_nummer": "V-123",
             "custom_rq_nummer": "NB-123",
             "continue_followup": "1",
+            "followup_type_id": str(monitor_type),
         },
     )
     assert response.status_code == 302
@@ -175,16 +184,12 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
             "v_number": "V-123",
             "rq_number": "NB-123",
         }
-
-    monitor_type = create_type(client, "Monitor")
-    add_field(client, monitor_type, "V Nummer")
-    add_field(client, monitor_type, "RQ Nummer")
-    client.post("/documentation-type/select", data={"type_id": str(monitor_type)})
+        assert session["documentation_type_id"] == monitor_type
 
     page = client.get("/").get_data(as_text=True)
     assert 'name="custom_v_nummer" value="V-123"' in page
     assert 'name="custom_rq_nummer" value="NB-123"' in page
-    assert "Weiteres Gerät für diesen Anwender dokumentieren" in page
+    assert "Folgegerät für denselben Anwender" in page
 
     response = client.post(
         "/save",
