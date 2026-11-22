@@ -197,3 +197,22 @@ def test_deleted_access_point_field_stays_deleted_after_next_request(client):
         "SELECT field_key FROM documentation_fields WHERE type_id=? AND field_key='room'",
         (ap_type,),
     )
+
+
+def test_site_summary_shows_documented_counts_per_type(client):
+    create_site(client)
+    assert client.post("/save", data=ap_payload()).status_code == 302
+
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "Raum")
+    client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
+    assert client.post("/save", data={"custom_raum": "Raum 1"}).status_code == 302
+    assert client.post("/save", data={"custom_raum": "Raum 2"}).status_code == 302
+
+    empty_type = create_type(client, "Datendose")
+    response = client.get("/")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'class="site-doc-tag">Access Point 1</span>' in page
+    assert 'class="site-doc-tag">Notebook 2</span>' in page
+    assert 'class="site-doc-tag">Datendose 0</span>' not in page
