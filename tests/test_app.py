@@ -242,3 +242,5 @@ def test_site_delete_list_has_address_and_inventory_search(client):
     assert 'data-search="teststraße 12 im-42"' in page
     assert "siteDeleteSearch.addEventListener('input'" in page
     assert ".site-admin-row[hidden]{display:none}" in page
+    assert 'class="site-admin-info"' in page
+    assert '.site-admin-row{flex-direction:column;align-items:stretch;gap:10px}' in page
