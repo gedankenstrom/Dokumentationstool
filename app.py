@@ -551,6 +551,8 @@ def get_site_export_data(conn, site_id):
             row = flatten_row(raw)
             row["documentation_type"] = next((t["name"] for t in types if t["id"] == row.get("doc_type_id")), "Unbekannt")
             records.append(row)
+    documented_type_ids = {row.get("doc_type_id") for row in records}
+    types = [doc_type for doc_type in types if doc_type["id"] in documented_type_ids]
     return site, types, records
 
 @app.get("/export.xlsx")
