@@ -56,13 +56,13 @@ Die Felder der Access-Point-Vorlage lassen sich ebenfalls verwalten. Für das AP
 
 ## CSV- und Excel-Export
 
-Der Export bezieht sich auf den aktuell ausgewählten Standort und enthält Einträge aller Dokumentationsarten. Jede Dokumentationsart erscheint als eigener Abschnitt mit eigener Überschrift und den passenden Spalten. Auch Vorlagen ohne Einträge werden im Export aufgeführt.
+Der Export bezieht sich auf den aktuell ausgewählten Standort und enthält nur Dokumentationsarten, für die dort mindestens ein Eintrag vorhanden ist. Jede enthaltene Dokumentationsart erscheint als eigener Abschnitt mit eigener Überschrift und den passenden Spalten.
 
 Die Standortadresse steht in jeder Zeile. Die Exportdatei wird nach Adresse und – falls vorhanden – IM-/VITKO-Nummer benannt. Die IM-/VITKO-Nummer selbst wird nicht als Tabellenspalte ausgegeben.
 
 Beim Export kannst du **Herunterladen** oder **Per E-Mail / Teilen** wählen. Auf iPhone und iPad öffnet die zweite Option das iOS-Teilen-Menü, über das du zum Beispiel Apple Mail auswählen kannst. Dafür muss die Weboberfläche über HTTPS erreichbar sein. Über eine reine HTTP-Adresse steht der Download zur Verfügung.
 
-Der CSV-Export verwendet Semikolon als Trennzeichen. Im Excel-Export werden Werte wie Seriennummer, MAC-Adresse und Raum als Text ausgegeben, damit Excel sie nicht automatisch als Datum oder Zahl umwandelt.
+Der CSV-Export verwendet Semikolon als Trennzeichen und gibt Textwerte als Excel-Textzellen aus. So bleiben Seriennummern, MAC-Adressen und Raumnummern beim Öffnen in Excel als Text erhalten; eingegebene Inhalte werden dabei nicht als Formeln ausgeführt. Beim Import in andere Programme können die Inhalte als Formeltexte erscheinen. Der Excel-Export (XLSX) speichert diese Werte direkt als Text.
 
 ## Smartphone-Zugriff
 
