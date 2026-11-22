@@ -170,3 +170,30 @@ def test_deleting_custom_template_removes_its_records(client):
     assert response.status_code == 302
     assert not rows("SELECT id FROM documentation_types WHERE id=?", (type_id,))
     assert not rows("SELECT id FROM access_points WHERE doc_type_id=?", (type_id,))
+
+
+def test_deleted_access_point_field_stays_deleted_after_next_request(client):
+    create_site(client)
+    ap_type = rows("SELECT id FROM documentation_types WHERE name='Access Point'")[0]["id"]
+    field = rows(
+        "SELECT id FROM documentation_fields WHERE type_id=? AND field_key='room'",
+        (ap_type,),
+    )[0]
+
+    response = client.post(
+        "/templates",
+        data={
+            "action": "update_field",
+            "type_id": str(ap_type),
+            "field_id": str(field["id"]),
+            "delete_field": "1",
+        },
+    )
+    assert response.status_code == 302
+
+    # The next request initializes the database again; the deleted field must not be reseeded.
+    assert client.get("/").status_code == 200
+    assert not rows(
+        "SELECT field_key FROM documentation_fields WHERE type_id=? AND field_key='room'",
+        (ap_type,),
+    )
