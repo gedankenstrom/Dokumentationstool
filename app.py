@@ -456,9 +456,11 @@ def save(record_id=None):
         if key in remember_keys:
             choice = request.form.get(key + "_choice", "").strip()
             new_value_name = field_form_name + "_new" if key in custom_keys else key + "_new"
-            value = request.form.get(new_value_name, "").strip() if choice == "__new__" else choice
+            legacy_new_value_name = key + "_new"
+            new_value = request.form.get(new_value_name, request.form.get(legacy_new_value_name, "")).strip()
+            value = new_value if choice == "__new__" else choice
         elif key in custom_keys:
-            value = request.form.get(field_form_name, "").strip()
+            value = request.form.get(field_form_name, request.form.get(key, "")).strip()
         elif key == "ap_model":
             value = request.form.get("ap_model", "").strip()
         elif key == "mac_address":
