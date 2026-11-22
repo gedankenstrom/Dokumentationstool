@@ -53,6 +53,7 @@ Die Felder der Access-Point-Vorlage lassen sich ebenfalls verwalten. Für das AP
 - Die Erfassung und Übersicht sind für iPhone, Android und Desktop ausgelegt.
 - Bei einem Bluetooth-Tastaturscanner springt **Enter** zum nächsten Feld. Es speichert den Eintrag nicht automatisch; am letzten Feld wird Enter ebenfalls abgefangen.
 - Einträge werden erst mit **Speichern** gesichert.
+- Wenn eine Vorlage Felder für **V-Nummer** und **RQ-Nummer** enthält, kann beim Speichern ein Folgegerät für denselben Anwender vorgemerkt werden. Nach der Auswahl der nächsten Dokumentationsart werden beide Werte in passenden Feldern übernommen. Die RQ-Nummer bleibt dabei der Notebook-Hostname und wird für zugehörige Geräte wie Monitore mitgeführt. Ohne Folgegerät wird die Vormerkung nach dem Speichern beendet.
 
 ## CSV- und Excel-Export
 
