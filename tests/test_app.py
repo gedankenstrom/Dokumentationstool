@@ -216,3 +216,17 @@ def test_site_summary_shows_documented_counts_per_type(client):
     assert 'class="site-doc-tag">Access Point 1</span>' in page
     assert 'class="site-doc-tag">Notebook 2</span>' in page
     assert 'class="site-doc-tag">Datendose 0</span>' not in page
+
+
+def test_site_delete_list_distinguishes_same_address_by_inventory_number(client):
+    create_site(client)  # Teststraße 12 with IM-42
+    client.post(
+        "/sites/create",
+        data={"street": "Teststraße", "house_number": "12", "inventory_number": ""},
+    )
+
+    response = client.get("/")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert "IM-/VITKO: IM-42" in page
+    assert "keine IM-/VITKO-Nr." in page
