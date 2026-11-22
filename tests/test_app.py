@@ -146,6 +146,20 @@ def test_custom_template_required_field_and_exports(client):
     assert "02. Okt" in values
 
 
+def test_template_manager_opens_selected_documentation_type(client):
+    create_site(client)
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "Modell")
+    client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
+
+    page = client.get("/").get_data(as_text=True)
+    assert f'href="/templates?type_id={notebook_type}">Vorlagen verwalten</a>' in page
+
+    manager = client.get(f"/templates?type_id={notebook_type}").get_data(as_text=True)
+    assert "Felder: Notebook" in manager
+    assert "Felder: Access Point" not in manager
+
+
 def test_followup_device_inherits_v_and_rq_numbers(client):
     create_site(client)
     monitor_type = create_type(client, "Monitor")
