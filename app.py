@@ -92,14 +92,16 @@ def db():
         conn.execute("ALTER TABLE access_points ADD COLUMN custom_data TEXT NOT NULL DEFAULT '{}'")
     conn.execute("CREATE TABLE IF NOT EXISTS documentation_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
     conn.execute("CREATE TABLE IF NOT EXISTS documentation_fields (id INTEGER PRIMARY KEY AUTOINCREMENT, type_id INTEGER NOT NULL REFERENCES documentation_types(id) ON DELETE CASCADE, field_key TEXT NOT NULL, label TEXT NOT NULL, required INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, is_custom INTEGER NOT NULL DEFAULT 0, remember_values INTEGER NOT NULL DEFAULT 0, UNIQUE(type_id, field_key))")
+    conn.execute("CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)")
     conn.execute("INSERT OR IGNORE INTO documentation_types (name) VALUES ('Access Point')")
     ap_type_id = conn.execute("SELECT id FROM documentation_types WHERE name='Access Point'").fetchone()[0]
-    for position, (field_key, label) in enumerate(FIELDS):
-        conn.execute("INSERT OR IGNORE INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom) VALUES (?,?,?,?,?,?,0)", (ap_type_id,field_key,label,1 if field_key=='ap_model' else 0,1,position))
+    if not conn.execute("SELECT 1 FROM app_migrations WHERE name='access_point_fields_seeded'").fetchone():
+        for position, (field_key, label) in enumerate(FIELDS):
+            conn.execute("INSERT OR IGNORE INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom) VALUES (?,?,?,?,?,?,0)", (ap_type_id,field_key,label,1 if field_key=='ap_model' else 0,1,position))
+        conn.execute("INSERT INTO app_migrations (name) VALUES ('access_point_fields_seeded')")
     field_columns = {row["name"] for row in conn.execute("PRAGMA table_info(documentation_fields)")}
     if "remember_values" not in field_columns:
         conn.execute("ALTER TABLE documentation_fields ADD COLUMN remember_values INTEGER NOT NULL DEFAULT 0")
-    conn.execute("CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)")
     conn.execute("CREATE TABLE IF NOT EXISTS site_field_defaults (site_id INTEGER NOT NULL, type_id INTEGER NOT NULL, field_key TEXT NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(site_id,type_id,field_key))")
     if not conn.execute("SELECT 1 FROM app_migrations WHERE name='ap_model_uses_managed_dropdown'").fetchone():
         conn.execute("UPDATE documentation_fields SET remember_values=1 WHERE type_id=? AND field_key='ap_model'", (ap_type_id,))
