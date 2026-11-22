@@ -150,7 +150,7 @@ def test_deleting_site_removes_devices_and_remembered_values(client):
     site_id = create_site(client)
     response = client.post("/save", data=ap_payload())
     assert response.status_code == 302
-    assert rows("SELECT id FROM site_field_defaults WHERE site_id=?", (site_id,))
+    assert rows("SELECT field_key FROM site_field_defaults WHERE site_id=?", (site_id,))
 
     response = client.post(f"/sites/delete/{site_id}")
     assert response.status_code == 302
