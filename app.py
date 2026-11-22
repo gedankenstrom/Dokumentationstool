@@ -382,6 +382,7 @@ def delete_site(site_id):
         conn.close()
         return redirect(url_for("index"))
     conn.execute("DELETE FROM access_points WHERE site_id=?", (site_id,))
+    conn.execute("DELETE FROM site_field_defaults WHERE site_id=?", (site_id,))
     conn.execute("DELETE FROM sites WHERE id=?", (site_id,))
     conn.commit()
     conn.close()
@@ -605,6 +606,15 @@ def export_xlsx():
     output.seek(0)
     return Response(output.getvalue(),mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{site_filename}.xlsx"'})
 
+def csv_excel_text(value):
+    text = "" if value is None else str(value)
+    if not text:
+        return ""
+    # A quoted Excel string literal preserves identifiers/dates as text and
+    # keeps user-entered values as text instead of evaluating their contents.
+    return '="' + text.replace('"', '""') + '"'
+
+
 @app.get("/export.csv")
 def export_csv():
     site_id = session.get("current_site_id")
@@ -618,11 +628,11 @@ def export_csv():
     writer = csv.writer(output,delimiter=";")
     for doc_type in types:
         fields = fields_by_type[doc_type["id"]]
-        writer.writerow(["Dokumentationsart: " + doc_type["name"]])
-        writer.writerow(["Standort"] + [label for _,label in fields])
+        writer.writerow([csv_excel_text("Dokumentationsart: " + doc_type["name"])])
+        writer.writerow([csv_excel_text("Standort")] + [csv_excel_text(label) for _,label in fields])
         for row in records:
             if row.get("doc_type_id") == doc_type["id"]:
-                writer.writerow([site_address] + [row.get(key,"") for key,_ in fields])
+                writer.writerow([csv_excel_text(site_address)] + [csv_excel_text(row.get(key,"")) for key,_ in fields])
         writer.writerow([])
     site_filename = secure_filename(" ".join(part for part in [site["street"],site["house_number"],site["inventory_number"],"Gesamtdokumentation"] if part).strip()) if site else "netzwerk-dokumentation"
     return Response("\ufeff"+output.getvalue(),mimetype="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="{site_filename}.csv"'})
