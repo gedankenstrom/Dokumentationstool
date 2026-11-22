@@ -152,6 +152,9 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     add_field(client, monitor_type, "V Nummer")
     add_field(client, monitor_type, "RQ Nummer")
 
+    outlet_type = create_type(client, "Datendose")
+    add_field(client, outlet_type, "Port")
+
     notebook_type = create_type(client, "Notebook")
     add_field(client, notebook_type, "V Nummer")
     add_field(client, notebook_type, "RQ Nummer")
@@ -159,7 +162,9 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
 
     response = client.get("/").get_data(as_text=True)
     assert "Welche Dokumentationsart folgt?" in response
-    assert f'<option value="{monitor_type}">Monitor</option>' in response
+    picker = response.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert f'<option value="{monitor_type}">Monitor</option>' in picker
+    assert f'<option value="{outlet_type}">Datendose</option>' not in picker
 
     response = client.post(
         "/save",
