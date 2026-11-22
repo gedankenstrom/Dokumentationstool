@@ -230,3 +230,14 @@ def test_site_delete_list_distinguishes_same_address_by_inventory_number(client)
     page = response.get_data(as_text=True)
     assert "IM-/VITKO: IM-42" in page
     assert "keine IM-/VITKO-Nr." in page
+
+
+def test_site_delete_list_has_address_and_inventory_search(client):
+    create_site(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="site-delete-search"' in page
+    assert 'placeholder="Adresse oder IM-/VITKO-Nummer"' in page
+    assert 'data-search="teststraße 12 im-42"' in page
+    assert "siteDeleteSearch.addEventListener('input'" in page
