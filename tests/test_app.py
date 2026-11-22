@@ -165,6 +165,7 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     monitor_type = create_type(client, "Monitor")
     add_field(client, monitor_type, "V Nummer")
     add_field(client, monitor_type, "RQ Nummer")
+    add_field(client, monitor_type, "Raum")
 
     outlet_type = create_type(client, "Datendose")
     add_field(client, outlet_type, "Port")
@@ -172,6 +173,7 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     notebook_type = create_type(client, "Notebook")
     add_field(client, notebook_type, "V Nummer")
     add_field(client, notebook_type, "RQ Nummer")
+    add_field(client, notebook_type, "Raum")
     client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
 
     response = client.get("/").get_data(as_text=True)
@@ -185,6 +187,7 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
         data={
             "custom_v_nummer": "V-123",
             "custom_rq_nummer": "NB-123",
+            "custom_raum": "Büro 2.14",
             "continue_followup": "1",
             "followup_type_id": str(monitor_type),
         },
@@ -197,17 +200,20 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     assert json.loads(notebook["custom_data"]) == {
         "custom_v_nummer": "V-123",
         "custom_rq_nummer": "NB-123",
+        "custom_raum": "Büro 2.14",
     }
     with client.session_transaction() as session:
         assert session["followup_context"] == {
             "v_number": "V-123",
             "rq_number": "NB-123",
+            "room": "Büro 2.14",
         }
         assert session["documentation_type_id"] == monitor_type
 
     page = client.get("/").get_data(as_text=True)
     assert 'name="custom_v_nummer" value="V-123"' in page
     assert 'name="custom_rq_nummer" value="NB-123"' in page
+    assert 'name="custom_raum" value="Büro 2.14"' in page
     assert "Folgegerät für denselben Anwender" in page
 
     response = client.post(
@@ -215,6 +221,7 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
         data={
             "custom_v_nummer": "V-123",
             "custom_rq_nummer": "NB-123",
+            "custom_raum": "Büro 2.14",
         },
     )
     assert response.status_code == 302
@@ -225,6 +232,7 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     assert json.loads(monitor["custom_data"]) == {
         "custom_v_nummer": "V-123",
         "custom_rq_nummer": "NB-123",
+        "custom_raum": "Büro 2.14",
     }
     with client.session_transaction() as session:
         assert "followup_context" not in session
