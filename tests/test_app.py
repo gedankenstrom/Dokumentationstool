@@ -180,7 +180,8 @@ def test_old_device_return_is_available_as_followup_without_new_rq_prefill(clien
 
     page = client.get("/").get_data(as_text=True)
     picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
-    assert f'<option value="{return_type["id"]}">Altgeräte-Rücknahme</option>' in picker
+    assert '<optgroup label="Folgegerät dokumentieren">' in picker
+    assert f'<optgroup label="Altgerät zurücknehmen"><option value="{return_type["id"]}">Altgeräte-Rücknahme</option></optgroup>' in picker
 
     response = client.post(
         "/save",
@@ -200,6 +201,7 @@ def test_old_device_return_is_available_as_followup_without_new_rq_prefill(clien
     assert "Gerätetyp/Modell" in page
     assert "Seriennummer" in page
     assert "Die RQ-Nummer des neuen Notebooks wird nicht übernommen." in page
+    assert 'class="followup-note return-device-note"' in page
     assert 'value="NB-NEW-123"' not in page
 
     response = client.post(
