@@ -473,3 +473,17 @@ def test_old_device_model_dropdown_is_shared_across_sites(client):
     assert '<select autocomplete="off" class="remembered-select" id="custom_device_type_model_choice"' in page
     assert 'value="Lenovo ThinkPad"' in page
     assert "Lenovo ThinkPad</option>" in page
+
+
+def test_documentation_type_selector_separates_old_device_return(client):
+    create_site(client)
+    return_type = rows(
+        "SELECT id FROM documentation_types WHERE workflow_kind='old_device_return'"
+    )[0]["id"]
+    client.post("/documentation-type/select", data={"type_id": str(return_type)})
+
+    page = client.get("/").get_data(as_text=True)
+    selector = page.split('name="type_id"', 1)[1].split("</select>", 1)[0]
+    assert '<optgroup label="Geräte dokumentieren">' in selector
+    assert '<optgroup label="↩ Altgerät zurücknehmen">' in selector
+    assert f'<option value="{return_type}" selected>Altgeräte-Rücknahme</option>' in selector
