@@ -31,8 +31,10 @@ def create_site(client):
         data={"street": "Teststraße", "house_number": "12", "inventory_number": "IM-42"},
     )
     assert response.status_code == 302
-    # Initialize the default documentation type stored in the session.
+    # Select the default template explicitly after the initial blank selection.
     assert client.get("/").status_code == 200
+    ap_type = rows("SELECT id FROM documentation_types WHERE name='Access Point'")[0]["id"]
+    assert client.post("/documentation-type/select", data={"type_id": str(ap_type)}).status_code == 302
     with client.session_transaction() as session:
         return session["current_site_id"]
 
@@ -641,3 +643,19 @@ def test_edit_entry_can_start_followup_documentation(client):
     assert updated[0]["room"] == "Raum 2"
     page = client.get("/").get_data(as_text=True)
     assert "Notebook dokumentieren" in page
+
+
+def test_documentation_type_starts_with_choose_template_prompt(client):
+    page = client.get("/").get_data(as_text=True)
+    assert '<option value="" disabled selected>Vorlage wählen …</option>' in page
+    assert "Access Point dokumentieren" not in page
+    assert "Dokumentierte Access Point-Einträge" not in page
+
+    response = client.post(
+        "/sites/create",
+        data={"street": "Teststraße", "house_number": "12", "inventory_number": ""},
+    )
+    assert response.status_code == 302
+    page = client.get("/").get_data(as_text=True)
+    assert "Wähle oben eine Dokumentationsart aus, um Einträge zu erfassen." in page
+    assert '<option value="" disabled selected>Vorlage wählen …</option>' in page
