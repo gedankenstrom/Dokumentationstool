@@ -180,6 +180,9 @@ def test_old_device_return_is_available_as_followup_without_new_rq_prefill(clien
 
     page = client.get("/").get_data(as_text=True)
     picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert '<strong class="next-step-title">Nächster Schritt (optional)</strong>' in page
+    assert "ein weiteres Gerät dokumentieren oder ein Altgerät zurücknehmen." in page
+    assert '<option value="">Kein weiteres Gerät</option>' in picker
     assert '<optgroup label="Folgegerät dokumentieren">' in picker
     assert f'<optgroup label="Altgerät zurücknehmen"><option value="{return_type["id"]}">Altgeräte-Rücknahme</option></optgroup>' in picker
 
@@ -238,10 +241,11 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     add_field(client, notebook_type, "V Nummer")
     add_field(client, notebook_type, "RQ Nummer")
     add_field(client, notebook_type, "Raum")
+    return_type = rows("SELECT id FROM documentation_types WHERE name='Altgeräte-Rücknahme'")[0]["id"]
     client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
 
     response = client.get("/").get_data(as_text=True)
-    assert "Welche Dokumentationsart folgt?" in response
+    assert "Nächster Schritt (optional)" in response
     picker = response.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
     assert f'<option value="{monitor_type}">Monitor</option>' in picker
     assert f'<option value="{outlet_type}">Datendose</option>' not in picker
@@ -252,7 +256,6 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
             "custom_v_nummer": "V-123",
             "custom_rq_nummer": "NB-123",
             "custom_raum": "Büro 2.14",
-            "continue_followup": "1",
             "followup_type_id": str(monitor_type),
         },
     )
@@ -279,6 +282,8 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     assert 'name="custom_rq_nummer" value="NB-123"' in page
     assert 'name="custom_raum" value="Büro 2.14"' in page
     assert "Folgegerät für denselben Anwender" in page
+    picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert f'<optgroup label="Altgerät zurücknehmen"><option value="{return_type}">Altgeräte-Rücknahme</option></optgroup>' in picker
 
     response = client.post(
         "/save",
@@ -286,6 +291,7 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
             "custom_v_nummer": "V-123",
             "custom_rq_nummer": "NB-123",
             "custom_raum": "Büro 2.14",
+            "followup_type_id": str(return_type),
         },
     )
     assert response.status_code == 302
@@ -297,6 +303,32 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
         "custom_v_nummer": "V-123",
         "custom_rq_nummer": "NB-123",
         "custom_raum": "Büro 2.14",
+    }
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == return_type
+        assert session["followup_context"] == {
+            "v_number": "V-123",
+            "rq_number": "NB-123",
+            "room": "Büro 2.14",
+        }
+    page = client.get("/").get_data(as_text=True)
+    assert "Altgerät zurücknehmen" in page
+    assert "Gerätetyp/Modell" in page and "Seriennummer" in page
+    response = client.post(
+        "/save",
+        data={
+            "custom_device_type_model": "Lenovo ThinkPad",
+            "custom_serial_number": "OLD-SN-123",
+        },
+    )
+    assert response.status_code == 302
+    old_device = rows(
+        "SELECT custom_data FROM access_points WHERE doc_type_id=?",
+        (return_type,),
+    )[0]
+    assert json.loads(old_device["custom_data"]) == {
+        "custom_device_type_model": "Lenovo ThinkPad",
+        "custom_serial_number": "OLD-SN-123",
     }
     with client.session_transaction() as session:
         assert "followup_context" not in session
