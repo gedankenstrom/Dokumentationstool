@@ -663,6 +663,11 @@ def test_documentation_type_starts_with_choose_template_prompt(client):
 
 def test_stale_documentation_type_selection_can_be_cleared(client):
     client.get("/")
+    client.post(
+        "/sites/create",
+        data={"street": "Teststraße", "house_number": "12", "inventory_number": ""},
+    )
+    client.get("/")
     ap_type = rows("SELECT id FROM documentation_types WHERE name='Access Point'")[0]["id"]
     with client.session_transaction() as session:
         session["documentation_type_id"] = ap_type
