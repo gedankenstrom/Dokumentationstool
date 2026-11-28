@@ -586,3 +586,25 @@ def test_access_point_can_be_selected_as_followup(client):
     with client.session_transaction() as session:
         assert session["documentation_type_id"] == ap_type
     assert len(rows("SELECT id FROM access_points WHERE doc_type_id=?", (ap_type,))) == 1
+
+
+def test_site_documentation_tag_opens_matching_device_overview(client):
+    create_site(client)
+    response = client.post("/save", data=ap_payload())
+    assert response.status_code == 302
+    ap_type = rows(
+        "SELECT id FROM documentation_types WHERE name='Access Point'"
+    )[0]["id"]
+
+    page = client.get("/").get_data(as_text=True)
+    assert f'href="/documentation-type/select-from-tag/{ap_type}"' in page
+    assert "Access Point 1</a>" in page
+
+    response = client.get(f"/documentation-type/select-from-tag/{ap_type}")
+    assert response.status_code == 302
+    assert response.location.endswith("#entries")
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == ap_type
+
+    overview = client.get(response.location).get_data(as_text=True)
+    assert '<section class="card" id="entries"><h2>Dokumentierte Access Point-Einträge</h2>' in overview
