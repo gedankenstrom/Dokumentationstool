@@ -90,7 +90,10 @@ def db():
         conn.execute("ALTER TABLE access_points ADD COLUMN doc_type_id INTEGER")
     if "custom_data" not in columns:
         conn.execute("ALTER TABLE access_points ADD COLUMN custom_data TEXT NOT NULL DEFAULT '{}'")
-    conn.execute("CREATE TABLE IF NOT EXISTS documentation_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
+    conn.execute("CREATE TABLE IF NOT EXISTS documentation_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, workflow_kind TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
+    type_columns = {row["name"] for row in conn.execute("PRAGMA table_info(documentation_types)")}
+    if "workflow_kind" not in type_columns:
+        conn.execute("ALTER TABLE documentation_types ADD COLUMN workflow_kind TEXT NOT NULL DEFAULT ''")
     conn.execute("CREATE TABLE IF NOT EXISTS documentation_fields (id INTEGER PRIMARY KEY AUTOINCREMENT, type_id INTEGER NOT NULL REFERENCES documentation_types(id) ON DELETE CASCADE, field_key TEXT NOT NULL, label TEXT NOT NULL, required INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, is_custom INTEGER NOT NULL DEFAULT 0, remember_values INTEGER NOT NULL DEFAULT 0, UNIQUE(type_id, field_key))")
     conn.execute("CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)")
     conn.execute("INSERT OR IGNORE INTO documentation_types (name) VALUES ('Access Point')")
@@ -106,6 +109,55 @@ def db():
     if not conn.execute("SELECT 1 FROM app_migrations WHERE name='ap_model_uses_managed_dropdown'").fetchone():
         conn.execute("UPDATE documentation_fields SET remember_values=1 WHERE type_id=? AND field_key='ap_model'", (ap_type_id,))
         conn.execute("INSERT INTO app_migrations (name) VALUES ('ap_model_uses_managed_dropdown')")
+    if not conn.execute("SELECT 1 FROM app_migrations WHERE name='old_device_return_template_seeded'").fetchone():
+        return_type = conn.execute(
+            "SELECT id FROM documentation_types WHERE workflow_kind='old_device_return' OR name='Altgeräte-Rücknahme'"
+        ).fetchone()
+        if return_type:
+            return_type_id = return_type["id"]
+            conn.execute(
+                "UPDATE documentation_types SET workflow_kind='old_device_return' WHERE id=?",
+                (return_type_id,),
+            )
+        else:
+            cursor = conn.execute(
+                "INSERT INTO documentation_types (name,workflow_kind) VALUES (?,?)",
+                ("Altgeräte-Rücknahme", "old_device_return"),
+            )
+            return_type_id = cursor.lastrowid
+        for field_key, label in (
+            ("custom_device_type_model", "Gerätetyp/Modell"),
+            ("custom_serial_number", "Seriennummer"),
+        ):
+            existing_field = conn.execute(
+                "SELECT id FROM documentation_fields WHERE type_id=? AND lower(label)=lower(?)",
+                (return_type_id, label),
+            ).fetchone()
+            if existing_field:
+                conn.execute(
+                    "UPDATE documentation_fields SET required=1,enabled=1 WHERE id=?",
+                    (existing_field["id"],),
+                )
+            else:
+                candidate_key = field_key
+                suffix = 2
+                while conn.execute(
+                    "SELECT 1 FROM documentation_fields WHERE type_id=? AND field_key=?",
+                    (return_type_id,candidate_key),
+                ).fetchone():
+                    candidate_key = field_key + "_" + str(suffix)
+                    suffix += 1
+                position = conn.execute(
+                    "SELECT COALESCE(MAX(position),-1)+1 FROM documentation_fields WHERE type_id=?",
+                    (return_type_id,),
+                ).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO documentation_fields (type_id,field_key,label,required,enabled,position,is_custom,remember_values) VALUES (?,?,?,?,1,?,1,0)",
+                    (return_type_id,candidate_key,label,1,position),
+                )
+        conn.execute(
+            "INSERT INTO app_migrations (name) VALUES ('old_device_return_template_seeded')"
+        )
     conn.execute("UPDATE access_points SET doc_type_id=? WHERE doc_type_id IS NULL", (ap_type_id,))
     conn.commit()
     return conn
@@ -144,6 +196,16 @@ def followup_field_role(field_key, label):
     if normalized_key in {"room", "customraum", "customroom"} or normalized_label in {"raum", "raumnummer", "room", "roomnumber"}:
         return "room"
     return None
+
+
+def is_old_device_return_template(doc_type, fields):
+    if not doc_type or doc_type["workflow_kind"] != "old_device_return":
+        return False
+    normalized_labels = {
+        re.sub(r"[\W_]+", "", label.casefold())
+        for _, label in fields
+    }
+    return {"gerätetypmodell", "seriennummer"}.issubset(normalized_labels)
 
 
 def get_remember_fields(conn, type_id):
@@ -207,7 +269,7 @@ PAGE = r'''<!doctype html>
 
 </details></section>
 <section class="card"><h2>Dokumentationsart</h2><form autocomplete="off" method="post" action="{{ url_for('select_documentation_type') }}"><div class="searchrow doctype-row"><select autocomplete="off" class="search" name="type_id" onchange="this.form.submit()">{% for type in types %}<option value="{{ type.id }}" {% if type.id==current_type.id %}selected{% endif %}>{{ type.name }}</option>{% endfor %}</select><a class="button secondary" href="{{ url_for('manage_templates', type_id=current_type.id) }}">Vorlagen verwalten</a></div></form></section>
-{% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else current_type.name ~ ' dokumentieren' }}</h2>{% if followup_context and not item %}<p class="followup-note">Folgegerät für denselben Anwender. V-Nummer, Notebook-Hostname (RQ-Nummer) und – falls eingetragen – Raum sind vorgemerkt.</p>{% endif %}<form method="post" autocomplete="off" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
+{% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else current_type.name ~ ' dokumentieren' }}</h2>{% if followup_context and not item %}<p class="followup-note">{% if current_type.workflow_kind == 'old_device_return' %}Altgeräte-Rücknahme: Gerätetyp/Modell und Seriennummer erfassen. Die RQ-Nummer des neuen Notebooks wird nicht übernommen.{% else %}Folgegerät für denselben Anwender. V-Nummer, Notebook-Hostname (RQ-Nummer) und – falls eingetragen – Raum sind vorgemerkt.{% endif %}</p>{% endif %}<form method="post" autocomplete="off" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
 {% for key,label in fields %}{% if key in remember_keys %}<div class="field"><label for="{{ key }}_choice">{{ label }}</label><select autocomplete="off" class="remembered-select" id="{{ key }}_choice" name="{{ key }}_choice" data-input="{{ key }}_new" data-required="{% if key in required_keys %}1{% else %}0{% endif %}" onchange="toggleRememberedField(this)" {% if key in required_keys %}required{% endif %}><option value="" {% if (item and not item[key]) or (not item and not field_defaults.get(key)) %}selected{% endif %}>Wert auswählen …</option>{% for option in suggestions.get(key,[]) %}<option value="{{ option }}" {% if (item and item[key]==option) or (not item and field_defaults.get(key)==option) %}selected{% endif %}>{{ option }}</option>{% endfor %}<option value="__new__" {% if (item and item[key] and item[key] not in suggestions.get(key,[])) or (not item and not field_defaults.get(key) and not suggestions.get(key,[])) %}selected{% endif %}>Neuen Wert eingeben …</option></select><input id="{{ key }}_new" name="{{ key }}_new" value="{{ item[key] if item else field_defaults.get(key,'') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Neuen Wert eingeben" {% if (item and (not item[key] or item[key] in suggestions.get(key,[]))) or (not item and (field_defaults.get(key) or suggestions.get(key,[]))) %}hidden{% endif %} {% if item and item[key] and item[key] not in suggestions.get(key,[]) and key in required_keys %}required{% endif %}></div>{% elif key=='ap_model' %}<div class="field"><label for="ap_model">{{ label }}</label><input id="ap_model" name="ap_model" value="{{ item.ap_model if item else preferred_model }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="AP-Modell eingeben" {% if key in required_keys %}required{% endif %}></div>{% elif key=='mac_address' %}<div class="field"><label for="hardware_mac">{{ label }}</label><input id="hardware_mac" name="hardware_mac" value="{{ item[key] if item else '' }}" placeholder="z. B. AA:BB:CC:DD:EE:FF" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" {% if key in required_keys %}required{% endif %}></div>{% elif key=='switch_name' %}<div class="field"><label for="network_switch_device">{{ label }}</label><input id="network_switch_device" name="network_switch_device" value="{{ item[key] if item else '' }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" {% if key in required_keys %}required{% endif %}></div>{% else %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else field_defaults.get(key,'') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" {% if key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %} {% if key in required_keys %}required{% endif %}></div>{% endif %}{% endfor %}
 </div>{% if not item and followup_fields_present %}<label class="followup-option"><input type="checkbox" name="continue_followup" value="1" onchange="toggleFollowupType()"> Weiteres Gerät für diesen Anwender dokumentieren</label><div class="followup-type-picker" id="followup-type-picker" hidden><label for="followup_type_id">Welche Dokumentationsart folgt?</label><select id="followup_type_id" name="followup_type_id" autocomplete="off" disabled><option value="">Dokumentationsart auswählen …</option>{% for type in followup_types %}<option value="{{ type.id }}">{{ type.name }}</option>{% endfor %}</select></div>{% endif %}<div class="form-foot"><button class="button" type="submit">{{ 'Änderungen speichern' if item else 'Eintrag speichern' }}</button>{% if item %}<a class="button secondary" href="{{ url_for('index') }}">Abbrechen</a>{% endif %}</div></form></section>{% else %}<section class="card"><h2>Geräte dokumentieren</h2><div class="empty">Wähle zuerst den Standort aus, an dem du gerade arbeitest.</div></section>{% endif %}
 <section class="card"><h2>Dokumentierte {{ current_type.name }}-Einträge</h2><p class="count">Gesamt: {{ total_devices }} {{ 'Gerät' if total_devices==1 else 'Geräte' }}</p>{% if current_site %}<p class="count">Standort: {{ current_site.street }} {{ current_site.house_number }}</p>{% endif %}<form autocomplete="off" class="searchrow" method="get"><input autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="search" name="q" value="{{ q }}" placeholder="Einträge durchsuchen …"><button class="button" type="submit">Suchen</button>{% if q %}<a class="button secondary" href="{{ url_for('index') }}">Zurücksetzen</a>{% endif %}</form>{% if q %}<p class="count">{{ rows|length }} Treffer für „{{ q }}“</p>{% endif %}
@@ -342,7 +404,8 @@ def index():
             for key, label in candidate_fields
             if followup_field_role(key, label)
         }
-        if {"v_number", "rq_number"}.issubset(candidate_roles):
+        if (is_old_device_return_template(candidate_type, candidate_fields)
+                or {"v_number", "rq_number"}.issubset(candidate_roles)):
             followup_types.append(candidate_type)
     followup_context = session.get("followup_context", {})
     followup_field_roles = {key: followup_field_role(key, label) for key, label in fields}
@@ -509,7 +572,7 @@ def save(record_id=None):
     if continue_followup:
         followup_type_id = request.form.get("followup_type_id", "").strip()
         followup_type = conn.execute(
-            "SELECT id, name FROM documentation_types WHERE id=?",
+            "SELECT id, name, workflow_kind FROM documentation_types WHERE id=?",
             (followup_type_id,),
         ).fetchone() if followup_type_id.isdigit() else None
         if not followup_type:
@@ -523,7 +586,13 @@ def save(record_id=None):
             for key, label in followup_fields
             if followup_field_role(key, label)
         }
-        if not {"v_number", "rq_number"}.issubset(followup_roles):
+        is_return_type = is_old_device_return_template(followup_type, followup_fields)
+        if followup_type["workflow_kind"] == "old_device_return" and not is_return_type:
+            conn.close()
+            from flask import flash
+            flash("Die Vorlage für Altgeräte benötigt die Felder Gerätetyp/Modell und Seriennummer.")
+            return redirect(url_for("index"))
+        elif not {"v_number", "rq_number"}.issubset(followup_roles):
             conn.close()
             from flask import flash
             flash("Die Folgegeräte-Vorlage benötigt Felder für V-Nummer und RQ-Nummer.")
