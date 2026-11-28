@@ -489,7 +489,7 @@ def test_documentation_type_selector_separates_old_device_return(client):
     assert f'<option value="{return_type}" selected>Altgeräte-Rücknahme</option>' in selector
 
 
-def test_standalone_old_device_return_offers_another_old_device(client):
+def test_standalone_old_device_return_can_continue_with_new_device(client):
     create_site(client)
     notebook_type = create_type(client, "Notebook")
     add_field(client, notebook_type, "V Nummer")
@@ -503,4 +503,35 @@ def test_standalone_old_device_return_offers_another_old_device(client):
     picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
     assert '<strong class="next-step-title">Nächster Schritt (optional)</strong>' in page
     assert '<optgroup label="Altgerät zurücknehmen">' in picker
-    assert '<optgroup label="Folgegerät dokumentieren">' not in picker
+    assert '<optgroup label="Folgegerät dokumentieren">' in picker
+    assert f'<option value="{notebook_type}">Notebook</option>' in picker
+
+    response = client.post(
+        "/save",
+        data={
+            "custom_device_type_model_choice": "__new__",
+            "custom_device_type_model_new": "Lenovo ThinkPad",
+            "custom_serial_number": "OLD-SN-2",
+            "followup_type_id": str(notebook_type),
+        },
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == notebook_type
+    page = client.get("/").get_data(as_text=True)
+    assert "Notebook dokumentieren" in page
+    assert 'name="custom_v_nummer" value=""' in page
+    assert 'name="custom_rq_nummer" value=""' in page
+
+    response = client.post(
+        "/save",
+        data={
+            "custom_v_nummer": "V-456",
+            "custom_rq_nummer": "NB-456",
+        },
+    )
+    assert response.status_code == 302
+    assert len(rows(
+        "SELECT id FROM access_points WHERE doc_type_id=?",
+        (notebook_type,),
+    )) == 1
