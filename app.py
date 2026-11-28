@@ -437,20 +437,8 @@ def index():
     site_documentation_counts = get_site_documentation_counts(conn, current_site["id"]) if current_site else []
     field_defaults = get_site_field_defaults(conn, current_site["id"] if current_site else None, type_id, remember_keys, current_type, current_site)
     field_defaults.update(followup_defaults)
-    current_roles = {role for role in followup_field_roles.values() if role}
-    has_current_user_context_fields = {"v_number", "rq_number"}.issubset(current_roles)
-    has_saved_user_context = all(
-        followup_context.get(role) for role in ("v_number", "rq_number")
-    )
-    can_offer_followup_types = (
-        has_current_user_context_fields
-        or has_saved_user_context
-        or is_old_device_return_template(current_type, fields)
-    )
-    followup_fields_present = (
-        can_offer_followup_types
-        or is_old_device_return_template(current_type, fields)
-    )
+    can_offer_followup_types = bool(followup_types)
+    followup_fields_present = bool(followup_types or return_types)
     for field_key, default_value in field_defaults.items():
         if default_value and field_key in suggestions:
             suggestions[field_key] = sorted(set(suggestions[field_key] + [default_value]), key=str.casefold)[:100]
@@ -634,8 +622,13 @@ def save(record_id=None):
             label for role, label in (("v_number", "V-Nummer"), ("rq_number", "RQ-Nummer"))
             if not new_followup_context.get(role)
         ]
-        if (missing_followup and not is_return_type
-                and doc_type["workflow_kind"] != "old_device_return"):
+        source_roles = {
+            followup_field_role(key, label)
+            for key, label in fields
+            if followup_field_role(key, label)
+        }
+        source_has_user_context_fields = {"v_number", "rq_number"}.issubset(source_roles)
+        if missing_followup and not is_return_type and source_has_user_context_fields:
             conn.close()
             from flask import flash
             flash("Für das Folgegerät fehlen: " + ", ".join(missing_followup) + ".")
