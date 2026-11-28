@@ -211,7 +211,8 @@ def test_old_device_return_is_available_as_followup_without_new_rq_prefill(clien
     response = client.post(
         "/save",
         data={
-            "custom_device_type_model": "Lenovo ThinkPad",
+            "custom_device_type_model_choice": "__new__",
+            "custom_device_type_model_new": "Lenovo ThinkPad",
             "custom_serial_number": "OLD-SN-123",
         },
     )
@@ -318,7 +319,8 @@ def test_followup_device_inherits_v_and_rq_numbers(client):
     response = client.post(
         "/save",
         data={
-            "custom_device_type_model": "Lenovo ThinkPad",
+            "custom_device_type_model_choice": "__new__",
+            "custom_device_type_model_new": "Lenovo ThinkPad",
             "custom_serial_number": "OLD-SN-123",
         },
     )
@@ -469,4 +471,5 @@ def test_old_device_model_dropdown_is_shared_across_sites(client):
     assert response.status_code == 302
     page = client.get("/").get_data(as_text=True)
     assert '<select autocomplete="off" class="remembered-select" id="custom_device_type_model_choice"' in page
-    assert '<option value="Lenovo ThinkPad">Lenovo ThinkPad</option>' in page
+    assert 'value="Lenovo ThinkPad"' in page
+    assert "Lenovo ThinkPad</option>" in page
