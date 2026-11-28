@@ -609,3 +609,35 @@ def test_site_documentation_tag_opens_matching_device_overview(client):
 
     overview = client.get(response.location).get_data(as_text=True)
     assert '<section class="card" id="entries"><h2>Dokumentierte Access Point-Einträge</h2>' in overview
+
+
+def test_edit_entry_can_start_followup_documentation(client):
+    create_site(client)
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "V Nummer")
+    add_field(client, notebook_type, "RQ Nummer")
+    assert client.post("/save", data=ap_payload()).status_code == 302
+    record_id = rows(
+        "SELECT id FROM access_points WHERE doc_type_id="
+        "(SELECT id FROM documentation_types WHERE name='Access Point')"
+    )[0]["id"]
+
+    page = client.get(f"/edit/{record_id}").get_data(as_text=True)
+    picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert '<strong class="next-step-title">Nächster Schritt (optional)</strong>' in page
+    assert f'<option value="{notebook_type}">Notebook</option>' in picker
+
+    response = client.post(
+        f"/save/{record_id}",
+        data={
+            **ap_payload(room="Raum 2"),
+            "followup_type_id": str(notebook_type),
+        },
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == notebook_type
+    updated = rows("SELECT room FROM access_points WHERE id=?", (record_id,))
+    assert updated[0]["room"] == "Raum 2"
+    page = client.get("/").get_data(as_text=True)
+    assert "Notebook dokumentieren" in page
