@@ -160,6 +160,68 @@ def test_template_manager_opens_selected_documentation_type(client):
     assert "Felder: Access Point" not in manager
 
 
+def test_old_device_return_is_available_as_followup_without_new_rq_prefill(client):
+    create_site(client)
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "V Nummer")
+    add_field(client, notebook_type, "RQ Nummer")
+    client.post("/documentation-type/select", data={"type_id": str(notebook_type)})
+
+    return_type = rows(
+        "SELECT id,workflow_kind FROM documentation_types WHERE name='Altgeräte-Rücknahme'"
+    )[0]
+    assert return_type["workflow_kind"] == "old_device_return"
+    return_fields = rows(
+        "SELECT field_key,label,required FROM documentation_fields WHERE type_id=? ORDER BY position",
+        (return_type["id"],),
+    )
+    assert [field["label"] for field in return_fields] == ["Gerätetyp/Modell", "Seriennummer"]
+    assert all(field["required"] for field in return_fields)
+
+    page = client.get("/").get_data(as_text=True)
+    picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert f'<option value="{return_type["id"]}">Altgeräte-Rücknahme</option>' in picker
+
+    response = client.post(
+        "/save",
+        data={
+            "custom_v_nummer": "V-123",
+            "custom_rq_nummer": "NB-NEW-123",
+            "continue_followup": "1",
+            "followup_type_id": str(return_type["id"]),
+        },
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == return_type["id"]
+        assert session["followup_context"]["rq_number"] == "NB-NEW-123"
+
+    page = client.get("/").get_data(as_text=True)
+    assert "Gerätetyp/Modell" in page
+    assert "Seriennummer" in page
+    assert "Die RQ-Nummer des neuen Notebooks wird nicht übernommen." in page
+    assert 'value="NB-NEW-123"' not in page
+
+    response = client.post(
+        "/save",
+        data={
+            "custom_device_type_model": "Lenovo ThinkPad",
+            "custom_serial_number": "OLD-SN-123",
+        },
+    )
+    assert response.status_code == 302
+    old_device = rows(
+        "SELECT custom_data FROM access_points WHERE doc_type_id=?",
+        (return_type["id"],),
+    )[0]
+    assert json.loads(old_device["custom_data"]) == {
+        "custom_device_type_model": "Lenovo ThinkPad",
+        "custom_serial_number": "OLD-SN-123",
+    }
+    with client.session_transaction() as session:
+        assert "followup_context" not in session
+
+
 def test_followup_device_inherits_v_and_rq_numbers(client):
     create_site(client)
     monitor_type = create_type(client, "Monitor")
