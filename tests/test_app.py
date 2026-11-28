@@ -563,3 +563,26 @@ def test_access_point_offers_followup_and_old_device_next_step(client):
     assert "Notebook dokumentieren" in page
     assert 'name="custom_v_nummer" value=""' in page
     assert 'name="custom_rq_nummer" value=""' in page
+
+
+def test_access_point_can_be_selected_as_followup(client):
+    create_site(client)
+    ap_type = rows(
+        "SELECT id FROM documentation_types WHERE name='Access Point'"
+    )[0]["id"]
+
+    page = client.get("/").get_data(as_text=True)
+    picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert f'<option value="{ap_type}">Access Point</option>' in picker
+
+    response = client.post(
+        "/save",
+        data={
+            **ap_payload(),
+            "followup_type_id": str(ap_type),
+        },
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == ap_type
+    assert len(rows("SELECT id FROM access_points WHERE doc_type_id=?", (ap_type,))) == 1
