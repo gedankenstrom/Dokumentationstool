@@ -486,7 +486,7 @@ def test_documentation_type_selector_separates_old_device_return(client):
     page = client.get("/").get_data(as_text=True)
     selector = page.split('name="type_id"', 1)[1].split("</select>", 1)[0]
     assert '<optgroup label="Geräte dokumentieren">' in selector
-    assert '<optgroup label="↩ Altgerät zurücknehmen">' in selector
+    assert '<optgroup label="Altgerät zurücknehmen">' in selector
     assert f'<option value="{return_type}" selected>Altgeräte-Rücknahme</option>' in selector
 
 
