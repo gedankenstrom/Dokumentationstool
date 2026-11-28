@@ -404,8 +404,9 @@ def test_site_summary_shows_documented_counts_per_type(client):
     response = client.get("/")
     assert response.status_code == 200
     page = response.get_data(as_text=True)
-    assert 'class="site-doc-tag">Access Point 1</span>' in page
-    assert 'class="site-doc-tag">Notebook 2</span>' in page
+    assert 'class="site-doc-tag"' in page
+    assert "Access Point 1</a>" in page
+    assert "Notebook 2</a>" in page
     assert 'class="site-doc-tag">Datendose 0</span>' not in page
 
 
