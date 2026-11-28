@@ -797,9 +797,10 @@ def export_xlsx():
     for doc_type in types:
         fields = fields_by_type[doc_type["id"]]
         section_label = "Dokumentationsart: " + doc_type["name"]
+        section_color = "B42318" if doc_type["workflow_kind"] == "old_device_return" else "087F8C"
         for column_index in range(1,max_columns+1):
             cell = sheet.cell(row=current_row,column=column_index,value=section_label if column_index==1 else "")
-            cell.fill = PatternFill("solid",fgColor="087F8C")
+            cell.fill = PatternFill("solid",fgColor=section_color)
             cell.font = Font(bold=True,color="FFFFFF")
         current_row += 1
         headers = ["Standort"] + [label for _,label in fields]
