@@ -433,3 +433,40 @@ def test_site_delete_list_has_address_and_inventory_search(client):
     assert ".site-admin-row[hidden]{display:none}" in page
     assert 'class="site-admin-info"' in page
     assert '.site-admin-row{flex-direction:column;align-items:stretch;gap:10px}' in page
+
+
+def test_old_device_model_dropdown_is_shared_across_sites(client):
+    first_site_id = create_site(client)
+    return_type = rows(
+        "SELECT id FROM documentation_types WHERE workflow_kind='old_device_return'"
+    )[0]["id"]
+    model_field = rows(
+        "SELECT field_key,remember_values FROM documentation_fields "
+        "WHERE type_id=? AND label='Gerätetyp/Modell'",
+        (return_type,),
+    )[0]
+    assert model_field["remember_values"] == 1
+
+    client.post("/documentation-type/select", data={"type_id": str(return_type)})
+    response = client.post(
+        "/save",
+        data={
+            "custom_device_type_model_choice": "__new__",
+            "custom_device_type_model_new": "Lenovo ThinkPad",
+            "custom_serial_number": "OLD-SN-1",
+        },
+    )
+    assert response.status_code == 302
+    assert rows(
+        "SELECT value FROM site_field_defaults WHERE site_id=? AND type_id=? AND field_key=?",
+        (first_site_id, return_type, model_field["field_key"]),
+    )
+
+    response = client.post(
+        "/sites/create",
+        data={"street": "Zweite Straße", "house_number": "8", "inventory_number": ""},
+    )
+    assert response.status_code == 302
+    page = client.get("/").get_data(as_text=True)
+    assert '<select autocomplete="off" class="remembered-select" id="custom_device_type_model_choice"' in page
+    assert '<option value="Lenovo ThinkPad">Lenovo ThinkPad</option>' in page
