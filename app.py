@@ -399,7 +399,7 @@ def index():
     known_streets = sorted({row["street"] for row in sites if row["street"]})
     known_site_addresses = [{"street":row["street"],"house_number":row["house_number"]} for row in sites]
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
-    types = get_types(conn)
+    types = sorted(get_types(conn), key=lambda doc_type: doc_type["name"].casefold())
     if not session.get("_documentation_type_prompt_initialized"):
         session.pop("documentation_type_id", None)
         session.pop("followup_context", None)
@@ -736,7 +736,7 @@ def edit(record_id):
     sites = conn.execute("SELECT * FROM sites ORDER BY street, house_number").fetchall()
     known_streets = sorted({row["street"] for row in sites if row["street"]})
     known_site_addresses = [{"street":row["street"],"house_number":row["house_number"]} for row in sites]
-    types = get_types(conn)
+    types = sorted(get_types(conn), key=lambda doc_type: doc_type["name"].casefold())
     followup_types = []
     return_types = []
     for candidate_type in types:
