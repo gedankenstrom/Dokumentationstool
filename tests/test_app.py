@@ -535,3 +535,31 @@ def test_standalone_old_device_return_can_continue_with_new_device(client):
         "SELECT id FROM access_points WHERE doc_type_id=?",
         (notebook_type,),
     )) == 1
+
+
+def test_access_point_offers_followup_and_old_device_next_step(client):
+    create_site(client)
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "V Nummer")
+    add_field(client, notebook_type, "RQ Nummer")
+
+    page = client.get("/").get_data(as_text=True)
+    picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert '<strong class="next-step-title">Nächster Schritt (optional)</strong>' in page
+    assert '<optgroup label="Folgegerät dokumentieren">' in picker
+    assert '<optgroup label="Altgerät zurücknehmen">' in picker
+
+    response = client.post(
+        "/save",
+        data={
+            **ap_payload(),
+            "followup_type_id": str(notebook_type),
+        },
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["documentation_type_id"] == notebook_type
+    page = client.get("/").get_data(as_text=True)
+    assert "Notebook dokumentieren" in page
+    assert 'name="custom_v_nummer" value=""' in page
+    assert 'name="custom_rq_nummer" value=""' in page
