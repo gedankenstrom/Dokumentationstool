@@ -442,7 +442,11 @@ def index():
     has_saved_user_context = all(
         followup_context.get(role) for role in ("v_number", "rq_number")
     )
-    can_offer_followup_types = has_current_user_context_fields or has_saved_user_context
+    can_offer_followup_types = (
+        has_current_user_context_fields
+        or has_saved_user_context
+        or is_old_device_return_template(current_type, fields)
+    )
     followup_fields_present = (
         can_offer_followup_types
         or is_old_device_return_template(current_type, fields)
@@ -630,7 +634,8 @@ def save(record_id=None):
             label for role, label in (("v_number", "V-Nummer"), ("rq_number", "RQ-Nummer"))
             if not new_followup_context.get(role)
         ]
-        if missing_followup and not is_return_type:
+        if (missing_followup and not is_return_type
+                and doc_type["workflow_kind"] != "old_device_return"):
             conn.close()
             from flask import flash
             flash("Für das Folgegerät fehlen: " + ", ".join(missing_followup) + ".")
