@@ -421,7 +421,7 @@ def index():
             for key, label in candidate_fields
             if followup_field_role(key, label)
         }
-        if {"v_number", "rq_number"}.issubset(candidate_roles):
+        if candidate_type["name"] == "Access Point" or {"v_number", "rq_number"}.issubset(candidate_roles):
             followup_types.append(candidate_type)
     followup_context = session.get("followup_context", {})
     followup_field_roles = {key: followup_field_role(key, label) for key, label in fields}
@@ -609,7 +609,7 @@ def save(record_id=None):
             from flask import flash
             flash("Die Vorlage für Altgeräte benötigt die Felder Gerätetyp/Modell und Seriennummer.")
             return redirect(url_for("index"))
-        elif not {"v_number", "rq_number"}.issubset(followup_roles):
+        elif followup_type["name"] != "Access Point" and not {"v_number", "rq_number"}.issubset(followup_roles):
             conn.close()
             from flask import flash
             flash("Die Folgegeräte-Vorlage benötigt Felder für V-Nummer und RQ-Nummer.")
