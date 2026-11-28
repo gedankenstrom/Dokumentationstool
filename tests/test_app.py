@@ -487,3 +487,20 @@ def test_documentation_type_selector_separates_old_device_return(client):
     assert '<optgroup label="Geräte dokumentieren">' in selector
     assert '<optgroup label="↩ Altgerät zurücknehmen">' in selector
     assert f'<option value="{return_type}" selected>Altgeräte-Rücknahme</option>' in selector
+
+
+def test_standalone_old_device_return_offers_another_old_device(client):
+    create_site(client)
+    notebook_type = create_type(client, "Notebook")
+    add_field(client, notebook_type, "V Nummer")
+    add_field(client, notebook_type, "RQ Nummer")
+    return_type = rows(
+        "SELECT id FROM documentation_types WHERE workflow_kind='old_device_return'"
+    )[0]["id"]
+    client.post("/documentation-type/select", data={"type_id": str(return_type)})
+
+    page = client.get("/").get_data(as_text=True)
+    picker = page.split('id="followup_type_id"', 1)[1].split("</select>", 1)[0]
+    assert '<strong class="next-step-title">Nächster Schritt (optional)</strong>' in page
+    assert '<optgroup label="Altgerät zurücknehmen">' in picker
+    assert '<optgroup label="Folgegerät dokumentieren">' not in picker
