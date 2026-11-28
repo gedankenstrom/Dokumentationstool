@@ -203,7 +203,8 @@ def test_old_device_return_is_available_as_followup_without_new_rq_prefill(clien
     page = client.get("/").get_data(as_text=True)
     assert "Gerätetyp/Modell" in page
     assert "Seriennummer" in page
-    assert "Die RQ-Nummer des neuen Notebooks wird nicht übernommen." in page
+    assert "Altgerät zurücknehmen" in page
+    assert "Die RQ-Nummer des neuen Notebooks wird nicht übernommen." not in page
     assert 'class="followup-note return-device-note"' in page
     assert 'value="NB-NEW-123"' not in page
 
