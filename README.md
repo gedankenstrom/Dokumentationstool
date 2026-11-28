@@ -18,7 +18,7 @@ Das Docker-Volume `dokumentation-daten` enthält die Datenbank und bleibt bei Co
 
 ## Updates über GitHub und Portainer
 
-GitHub Actions baut bei jedem Push auf `main` ein neues Image und veröffentlicht es in GHCR. Zum Aktualisieren des laufenden Stacks in Portainer **Pull and redeploy** wählen.
+GitHub Actions führt bei jedem Push auf `main` zuerst die automatisierten Tests aus. Wenn sie erfolgreich sind, wird ein neues Image gebaut und in GHCR veröffentlicht. Zum Aktualisieren des laufenden Stacks in Portainer **Pull and redeploy** wählen.
 
 Falls Portainer das Image nicht laden kann, im GitHub-Repository unter **Packages** das Paket `dokumentationstool` öffnen und seine Sichtbarkeit auf **Public** setzen.
 
@@ -27,6 +27,7 @@ Falls Portainer das Image nicht laden kann, im GitHub-Repository unter **Package
 - Ein Standort besteht aus Straße und Hausnummer. Optional kannst du eine IM- oder VITKO-Nummer hinterlegen.
 - Beim Anlegen eines Standorts werden bereits verwendete Straßen vorgeschlagen. Nach der Straßenauswahl schlägt das Hausnummernfeld passende Nummern für diese Straße vor.
 - Die IM-/VITKO-Nummer gehört zum Standort, nicht zu den einzelnen Gerätefeldern. Sie wird nicht als Exportspalte ausgegeben.
+- Unter dem ausgewählten Standort zeigen anklickbare Tags die Anzahl der erfassten Geräte je Dokumentationsart. Ein Tipp auf einen Tag wählt die passende Dokumentationsart aus und springt zur zugehörigen Übersicht.
 - Beim Löschen eines Standorts werden nach Bestätigung auch alle zugehörigen Einträge gelöscht.
 
 ## Dokumentationsvorlagen und Felder
@@ -40,7 +41,7 @@ Unter **Vorlagen verwalten** kannst du für jede eigene Vorlage:
 - die Reihenfolge mit **↑** und **↓** ändern
 - optional **Dropdown mit bisherigen Werten** aktivieren
 
-Wenn die Dropdown-Option aktiv ist, stehen bereits verwendete Werte der Dokumentationsart zur Auswahl. Der zuletzt gespeicherte Wert wird je Standort und Dokumentationsart beim nächsten Eintrag vorausgewählt. Neue Werte lassen sich weiterhin eingeben.
+Wenn die Dropdown-Option aktiv ist, stehen bereits verwendete Werte derselben Dokumentationsart standortübergreifend zur Auswahl. Der zuletzt gespeicherte Wert wird je Standort und Dokumentationsart beim nächsten Eintrag vorausgewählt. Neue Werte lassen sich weiterhin eingeben.
 
 Die Felder der Access-Point-Vorlage lassen sich ebenfalls verwalten. Für das AP-Modell ist das Dropdown mit bisherigen Werten optional. Das zuletzt gespeicherte Modell wird je Standort vorausgewählt.
 
@@ -53,8 +54,10 @@ Die Felder der Access-Point-Vorlage lassen sich ebenfalls verwalten. Für das AP
 - Die Erfassung und Übersicht sind für iPhone, Android und Desktop ausgelegt.
 - Bei einem Bluetooth-Tastaturscanner springt **Enter** zum nächsten Feld. Es speichert den Eintrag nicht automatisch; am letzten Feld wird Enter ebenfalls abgefangen.
 - Einträge werden erst mit **Speichern** gesichert.
-- Für zurückgenommene Altgeräte gibt es die Dokumentationsart **Altgeräte-Rücknahme** mit den Pflichtfeldern **Gerätetyp/Modell** und **Seriennummer**. Sie kann als Folgegerät ausgewählt werden; die RQ-Nummer des neu ausgegebenen Notebooks wird dabei nicht übernommen.
-- Wenn eine Vorlage Felder für **V-Nummer** und **RQ-Nummer** enthält, kannst du beim Speichern ein Folgegerät auswählen. Ein Dropdown zeigt die nächste Dokumentationsart. Nach dem Speichern wechselt die Erfassung direkt dorthin und übernimmt beide Werte in passende Felder. Die RQ-Nummer bleibt der Notebook-Hostname und wird für zugehörige Geräte wie Monitore mitgeführt. Ein eingetragener Raum wird ebenfalls für Folgegeräte übernommen. Ohne Folgegerät endet die Vormerkung nach dem Speichern.
+- Für zurückgenommene Altgeräte gibt es die Dokumentationsart **Altgeräte-Rücknahme** mit den Pflichtfeldern **Gerätetyp/Modell** und **Seriennummer**. Das Dropdown für Gerätetyp/Modell merkt sich verwendete Werte und bietet sie standortübergreifend an.
+- Unter **Nächster Schritt (optional)** wählst du vor dem Speichern aus, was du danach dokumentieren möchtest. Dazu zählen Folgegeräte, weitere **Access Points** und **Altgeräte-Rücknahme**. Nach dem Speichern wechselt die Erfassung direkt zum ausgewählten Formular.
+- Wenn im bisherigen Eintrag passende Felder vorhanden sind, werden **V-Nummer**, **RQ-Nummer** und ein eingetragener **Raum** in passende Folgefelder übernommen. Die RQ-Nummer bleibt der Hostname des Notebooks und kann auch bei zugehörigen Geräten wie Monitoren mitgeführt werden. Wenn der bisherige Eintrag keine Anwenderdaten enthält, kannst du V- und RQ-Nummer im Folgeformular eintragen.
+- Auch nach einer Altgeräte-Rücknahme kannst du ein weiteres Gerät dokumentieren oder eine weitere Rücknahme beginnen. Bei einem eigenständigen Altgeräte-Eintrag ohne Anwenderdaten werden V- und RQ-Nummern im nächsten Geräteformular neu eingetragen.
 
 ## CSV- und Excel-Export
 
@@ -68,7 +71,9 @@ Der CSV-Export verwendet Semikolon als Trennzeichen und gibt Textwerte als Excel
 
 ## Smartphone-Zugriff
 
-iPhone und Android müssen sich im selben Netzwerk wie der Docker-Host befinden. Öffne die Weboberfläche mit der IP-Adresse des Hosts und Port 8086. Für Zugriff außerhalb des lokalen Netzwerks VPN oder einen HTTPS-Reverse-Proxy verwenden.
+iPhone und Android müssen sich im selben Netzwerk wie der Docker-Host befinden. Öffne die Weboberfläche mit der IP-Adresse des Hosts und Port 8086. Für Zugriff außerhalb des lokalen Netzwerks VPN oder einen HTTPS-Reverse-Proxy mit Zugriffsschutz verwenden.
+
+Die Anwendung hat keine integrierte Benutzeranmeldung. Beschränke den Zugriff auf ein vertrauenswürdiges Netzwerk oder richte am Reverse-Proxy zusätzlich eine Anmeldung ein. HTTPS verschlüsselt die Verbindung, ersetzt aber keine Zugriffskontrolle.
 
 ## Datensicherung
 
