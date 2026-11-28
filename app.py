@@ -284,7 +284,7 @@ PAGE = r'''<!doctype html>
 <section class="card"><h2>Dokumentationsart</h2><form autocomplete="off" method="post" action="{{ url_for('select_documentation_type') }}"><div class="searchrow doctype-row"><select autocomplete="off" class="search" name="type_id" aria-label="Dokumentationsart auswählen" onchange="this.form.submit()">{% set device_types = types|rejectattr('workflow_kind', 'equalto', 'old_device_return')|list %}{% set return_types = types|selectattr('workflow_kind', 'equalto', 'old_device_return')|list %}{% if device_types %}<optgroup label="Geräte dokumentieren">{% for type in device_types %}<option value="{{ type.id }}" {% if type.id==current_type.id %}selected{% endif %}>{{ type.name }}</option>{% endfor %}</optgroup>{% endif %}{% if return_types %}<optgroup label="↩ Altgerät zurücknehmen">{% for type in return_types %}<option value="{{ type.id }}" {% if type.id==current_type.id %}selected{% endif %}>{{ type.name }}</option>{% endfor %}</optgroup>{% endif %}</select><a class="button secondary" href="{{ url_for('manage_templates', type_id=current_type.id) }}">Vorlagen verwalten</a></div></form></section>
 {% if current_site %}<section class="card" id="entry"><h2>{{ 'Eintrag bearbeiten' if item else current_type.name ~ ' dokumentieren' }}</h2>{% if followup_context and not item %}{% if current_type.workflow_kind == 'old_device_return' %}<p class="followup-note return-device-note"><strong>↩ Altgerät zurücknehmen</strong></p>{% else %}<p class="followup-note">Folgegerät für denselben Anwender. V-Nummer, Notebook-Hostname (RQ-Nummer) und – falls eingetragen – Raum sind vorgemerkt.</p>{% endif %}{% endif %}<form method="post" autocomplete="off" action="{{ url_for('save', record_id=item.id) if item else url_for('save') }}"><div class="grid">
 {% for key,label in fields %}{% if key in remember_keys %}<div class="field"><label for="{{ key }}_choice">{{ label }}</label><select autocomplete="off" class="remembered-select" id="{{ key }}_choice" name="{{ key }}_choice" data-input="{{ key }}_new" data-required="{% if key in required_keys %}1{% else %}0{% endif %}" onchange="toggleRememberedField(this)" {% if key in required_keys %}required{% endif %}><option value="" {% if (item and not item[key]) or (not item and not field_defaults.get(key)) %}selected{% endif %}>Wert auswählen …</option>{% for option in suggestions.get(key,[]) %}<option value="{{ option }}" {% if (item and item[key]==option) or (not item and field_defaults.get(key)==option) %}selected{% endif %}>{{ option }}</option>{% endfor %}<option value="__new__" {% if (item and item[key] and item[key] not in suggestions.get(key,[])) or (not item and not field_defaults.get(key) and not suggestions.get(key,[])) %}selected{% endif %}>Neuen Wert eingeben …</option></select><input id="{{ key }}_new" name="{{ key }}_new" value="{{ item[key] if item else field_defaults.get(key,'') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Neuen Wert eingeben" {% if (item and (not item[key] or item[key] in suggestions.get(key,[]))) or (not item and (field_defaults.get(key) or suggestions.get(key,[]))) %}hidden{% endif %} {% if item and item[key] and item[key] not in suggestions.get(key,[]) and key in required_keys %}required{% endif %}></div>{% elif key=='ap_model' %}<div class="field"><label for="ap_model">{{ label }}</label><input id="ap_model" name="ap_model" value="{{ item.ap_model if item else preferred_model }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="AP-Modell eingeben" {% if key in required_keys %}required{% endif %}></div>{% elif key=='mac_address' %}<div class="field"><label for="hardware_mac">{{ label }}</label><input id="hardware_mac" name="hardware_mac" value="{{ item[key] if item else '' }}" placeholder="z. B. AA:BB:CC:DD:EE:FF" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" {% if key in required_keys %}required{% endif %}></div>{% elif key=='switch_name' %}<div class="field"><label for="network_switch_device">{{ label }}</label><input id="network_switch_device" name="network_switch_device" value="{{ item[key] if item else '' }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" {% if key in required_keys %}required{% endif %}></div>{% else %}<div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" name="{{ key }}" value="{{ item[key] if item else field_defaults.get(key,'') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" {% if key=='room' %}placeholder="z. B. 2. OG · Büro 2.14"{% endif %} {% if key in required_keys %}required{% endif %}></div>{% endif %}{% endfor %}
-</div>{% if not item and followup_fields_present %}<div class="followup-type-picker"><strong class="next-step-title">Nächster Schritt (optional)</strong><label for="followup_type_id">Nach dem Speichern kannst du ein weiteres Gerät dokumentieren oder ein Altgerät zurücknehmen.</label><select id="followup_type_id" name="followup_type_id" autocomplete="off"><option value="">Kein weiteres Gerät</option>{% if followup_types and can_offer_followup_types %}<optgroup label="Folgegerät dokumentieren">{% for type in followup_types %}<option value="{{ type.id }}">{{ type.name }}</option>{% endfor %}</optgroup>{% endif %}{% if return_types %}<optgroup label="Altgerät zurücknehmen">{% for type in return_types %}<option value="{{ type.id }}">{{ type.name }}</option>{% endfor %}</optgroup>{% endif %}</select></div>{% endif %}<div class="form-foot"><button class="button" type="submit">{{ 'Änderungen speichern' if item else 'Eintrag speichern' }}</button>{% if item %}<a class="button secondary" href="{{ url_for('index') }}">Abbrechen</a>{% endif %}</div></form></section>{% else %}<section class="card"><h2>Geräte dokumentieren</h2><div class="empty">Wähle zuerst den Standort aus, an dem du gerade arbeitest.</div></section>{% endif %}
+</div>{% if followup_fields_present %}<div class="followup-type-picker"><strong class="next-step-title">Nächster Schritt (optional)</strong><label for="followup_type_id">Nach dem Speichern kannst du ein weiteres Gerät dokumentieren oder ein Altgerät zurücknehmen.</label><select id="followup_type_id" name="followup_type_id" autocomplete="off"><option value="">Kein weiteres Gerät</option>{% if followup_types and can_offer_followup_types %}<optgroup label="Folgegerät dokumentieren">{% for type in followup_types %}<option value="{{ type.id }}">{{ type.name }}</option>{% endfor %}</optgroup>{% endif %}{% if return_types %}<optgroup label="Altgerät zurücknehmen">{% for type in return_types %}<option value="{{ type.id }}">{{ type.name }}</option>{% endfor %}</optgroup>{% endif %}</select></div>{% endif %}<div class="form-foot"><button class="button" type="submit">{{ 'Änderungen speichern' if item else 'Eintrag speichern' }}</button>{% if item %}<a class="button secondary" href="{{ url_for('index') }}">Abbrechen</a>{% endif %}</div></form></section>{% else %}<section class="card"><h2>Geräte dokumentieren</h2><div class="empty">Wähle zuerst den Standort aus, an dem du gerade arbeitest.</div></section>{% endif %}
 <section class="card" id="entries"><h2>Dokumentierte {{ current_type.name }}-Einträge</h2><p class="count">Gesamt: {{ total_devices }} {{ 'Gerät' if total_devices==1 else 'Geräte' }}</p>{% if current_site %}<p class="count">Standort: {{ current_site.street }} {{ current_site.house_number }}</p>{% endif %}<form autocomplete="off" class="searchrow" method="get"><input autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="search" name="q" value="{{ q }}" placeholder="Einträge durchsuchen …"><button class="button" type="submit">Suchen</button>{% if q %}<a class="button secondary" href="{{ url_for('index') }}">Zurücksetzen</a>{% endif %}</form>{% if q %}<p class="count">{{ rows|length }} Treffer für „{{ q }}“</p>{% endif %}
 {% if rows %}<div class="tablewrap desktop"><table><thead><tr>{% for key,label in fields %}<th>{{ label }}</th>{% endfor %}<th></th></tr></thead><tbody>{% for row in rows %}<tr>{% for key,label in fields %}<td>{{ row[key] or '–' }}</td>{% endfor %}<td class="actions-cell"><a class="link" href="{{ url_for('edit', record_id=row.id) }}">Bearbeiten</a> · <form autocomplete="off" style="display:inline" method="post" action="{{ url_for('delete', record_id=row.id) }}" onsubmit="return confirm('Diesen Eintrag löschen?')"><button class="link" style="border:0;background:none;padding:0;cursor:pointer" type="submit">Löschen</button></form></td></tr>{% endfor %}</tbody></table></div>
 <div class="mobile-list">{% for row in rows %}<article class="mobile-item"><div class="device-heading"><div class="device-title"><div class="device-model">{{ row[fields[0][0]] if fields and row[fields[0][0]] else current_type.name }}</div></div><a class="device-edit" href="{{ url_for('edit', record_id=row.id) }}">Bearbeiten</a></div><div class="device-grid">{% for key,label in fields %}{% if not loop.first %}<div class="device-field"><span class="device-label">{{ label }}</span><span class="device-value">{{ row[key] or '–' }}</span></div>{% endif %}{% endfor %}</div><form autocomplete="off" method="post" action="{{ url_for('delete', record_id=row.id) }}" onsubmit="return confirm('Diesen Eintrag löschen?')"><button class="device-delete" type="submit">Eintrag löschen</button></form></article>{% endfor %}</div>
@@ -594,7 +594,7 @@ def save(record_id=None):
         else:
             value = request.form.get(key, "").strip()
         values[key] = value
-    continue_followup = not record_id and (request.form.get("continue_followup") == "1" or bool(request.form.get("followup_type_id", "").strip()))
+    continue_followup = request.form.get("continue_followup") == "1" or bool(request.form.get("followup_type_id", "").strip())
     followup_type = None
     new_followup_context = dict(session.get("followup_context", {}))
     if continue_followup:
@@ -692,13 +692,13 @@ def save(record_id=None):
     conn.commit()
     conn.close()
     from flask import flash
-    if not record_id:
-        if continue_followup:
-            session["followup_context"] = new_followup_context
-            session["documentation_type_id"] = followup_type["id"]
-            message = "Eintrag gespeichert. Dokumentiere jetzt das Folgegerät: " + followup_type["name"] + "."
-        else:
-            session.pop("followup_context", None)
+    if continue_followup:
+        session["followup_context"] = new_followup_context
+        session["documentation_type_id"] = followup_type["id"]
+        action_message = "Änderungen gespeichert." if record_id else "Eintrag gespeichert."
+        message = action_message + " Nächster Schritt: " + followup_type["name"] + "."
+    elif not record_id:
+        session.pop("followup_context", None)
     flash(message)
     return redirect(url_for("index"))
 
@@ -723,6 +723,22 @@ def edit(record_id):
     known_streets = sorted({row["street"] for row in sites if row["street"]})
     known_site_addresses = [{"street":row["street"],"house_number":row["house_number"]} for row in sites]
     types = get_types(conn)
+    followup_types = []
+    return_types = []
+    for candidate_type in types:
+        candidate_fields, _, _ = get_fields(conn, candidate_type["id"])
+        if is_old_device_return_template(candidate_type, candidate_fields):
+            return_types.append(candidate_type)
+            continue
+        candidate_roles = {
+            followup_field_role(key, label)
+            for key, label in candidate_fields
+            if followup_field_role(key, label)
+        }
+        if candidate_type["name"] == "Access Point" or {"v_number", "rq_number"}.issubset(candidate_roles):
+            followup_types.append(candidate_type)
+    can_offer_followup_types = bool(followup_types)
+    followup_fields_present = bool(followup_types or return_types)
     site_counts = {row["site_id"]: row["total"] for row in conn.execute("SELECT site_id, COUNT(*) AS total FROM access_points WHERE site_id IS NOT NULL GROUP BY site_id")}
     models = [row["model"] for row in conn.execute("SELECT ap_model AS model FROM access_points WHERE TRIM(ap_model)<>'' UNION SELECT default_ap_model AS model FROM sites WHERE TRIM(default_ap_model)<>'' ORDER BY model COLLATE NOCASE")]
     ap_model_custom = bool(item.get("ap_model")) and item["ap_model"] not in models
@@ -736,7 +752,7 @@ def edit(record_id):
     total_devices = conn.execute("SELECT COUNT(*) FROM access_points WHERE site_id=? AND doc_type_id=?", (site_id,type_id)).fetchone()[0]
     rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE site_id=? AND doc_type_id=? ORDER BY id DESC", (site_id,type_id)).fetchall()]
     conn.close()
-    return render_template_string(PAGE, rows=rows, q="", fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=item, sites=sites, current_site=current_site, site_documentation_counts=site_documentation_counts, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions, field_defaults=field_defaults, known_streets=known_streets, known_site_addresses=known_site_addresses)
+    return render_template_string(PAGE, rows=rows, q="", fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=item, sites=sites, current_site=current_site, site_documentation_counts=site_documentation_counts, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, followup_types=followup_types, return_types=return_types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions, field_defaults=field_defaults, followup_fields_present=followup_fields_present, can_offer_followup_types=can_offer_followup_types, known_streets=known_streets, known_site_addresses=known_site_addresses)
 
 @app.post("/delete/<int:record_id>")
 def delete(record_id):
