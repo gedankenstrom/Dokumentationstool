@@ -158,6 +158,19 @@ def db():
         conn.execute(
             "INSERT INTO app_migrations (name) VALUES ('old_device_return_template_seeded')"
         )
+    if not conn.execute("SELECT 1 FROM app_migrations WHERE name='old_device_model_global_dropdown'").fetchone():
+        return_type = conn.execute(
+            "SELECT id FROM documentation_types WHERE workflow_kind='old_device_return'"
+        ).fetchone()
+        if return_type:
+            conn.execute(
+                "UPDATE documentation_fields SET remember_values=1 "
+                "WHERE type_id=? AND lower(label)=lower(?) AND enabled=1",
+                (return_type["id"], "Gerätetyp/Modell"),
+            )
+        conn.execute(
+            "INSERT INTO app_migrations (name) VALUES ('old_device_model_global_dropdown')"
+        )
     conn.execute("UPDATE access_points SET doc_type_id=? WHERE doc_type_id IS NULL", (ap_type_id,))
     conn.commit()
     return conn
