@@ -647,7 +647,7 @@ def test_edit_entry_can_start_followup_documentation(client):
 
 def test_documentation_type_starts_with_choose_template_prompt(client):
     page = client.get("/").get_data(as_text=True)
-    assert '<option value="" disabled selected>Vorlage wählen …</option>' in page
+    assert '<option value="" selected>Vorlage wählen …</option>' in page
     assert "Access Point dokumentieren" not in page
     assert "Dokumentierte Access Point-Einträge" not in page
 
@@ -658,4 +658,25 @@ def test_documentation_type_starts_with_choose_template_prompt(client):
     assert response.status_code == 302
     page = client.get("/").get_data(as_text=True)
     assert "Wähle oben eine Dokumentationsart aus, um Einträge zu erfassen." in page
-    assert '<option value="" disabled selected>Vorlage wählen …</option>' in page
+    assert '<option value="" selected>Vorlage wählen …</option>' in page
+
+
+def test_stale_documentation_type_selection_can_be_cleared(client):
+    client.get("/")
+    ap_type = rows("SELECT id FROM documentation_types WHERE name='Access Point'")[0]["id"]
+    with client.session_transaction() as session:
+        session["documentation_type_id"] = ap_type
+        session.pop("_documentation_type_prompt_initialized", None)
+
+    page = client.get("/").get_data(as_text=True)
+    assert '<option value="" selected>Vorlage wählen …</option>' in page
+    assert "Access Point dokumentieren" not in page
+
+    client.post("/documentation-type/select", data={"type_id": str(ap_type)})
+    page = client.get("/").get_data(as_text=True)
+    assert "Access Point dokumentieren" in page
+
+    client.post("/documentation-type/select", data={"type_id": ""})
+    page = client.get("/").get_data(as_text=True)
+    assert '<option value="" selected>Vorlage wählen …</option>' in page
+    assert "Access Point dokumentieren" not in page
