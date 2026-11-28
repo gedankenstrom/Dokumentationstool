@@ -587,7 +587,9 @@ def save(record_id=None):
             if followup_field_role(key, label)
         }
         is_return_type = is_old_device_return_template(followup_type, followup_fields)
-        if followup_type["workflow_kind"] == "old_device_return" and not is_return_type:
+        if is_return_type:
+            pass
+        elif followup_type["workflow_kind"] == "old_device_return":
             conn.close()
             from flask import flash
             flash("Die Vorlage für Altgeräte benötigt die Felder Gerätetyp/Modell und Seriennummer.")
