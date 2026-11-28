@@ -469,7 +469,7 @@ def index():
                 params.extend([like] * len(clauses))
         rows = [flatten_row(row) for row in conn.execute("SELECT * FROM access_points WHERE " + where + " ORDER BY id DESC", params).fetchall()]
     conn.close()
-    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_documentation_counts=site_documentation_counts, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, followup_types=followup_types, return_types=return_types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions, field_defaults=field_defaults, followup_context=followup_context, followup_fields_present=followup_fields_present, known_streets=known_streets, known_site_addresses=known_site_addresses)
+    return render_template_string(PAGE, rows=rows, q=q, fields=fields, required_keys=required_keys, custom_keys=custom_keys, item=None, sites=sites, current_site=current_site, site_documentation_counts=site_documentation_counts, site_counts=site_counts, models=models, ap_model_custom=ap_model_custom, preferred_model=preferred_model, total_devices=total_devices, types=types, followup_types=followup_types, return_types=return_types, current_type=current_type, remember_keys=remember_keys, suggestions=suggestions, field_defaults=field_defaults, followup_context=followup_context, followup_fields_present=followup_fields_present, can_offer_followup_types=can_offer_followup_types, known_streets=known_streets, known_site_addresses=known_site_addresses)
 
 @app.post("/documentation-type/select")
 def select_documentation_type():
